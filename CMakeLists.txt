@@ -6,8 +6,11 @@ include(GNUInstallDirs)
 include(InstallRequiredSystemLibraries)
 include(CMakePackageConfigHelpers)
 
-add_subdirectory(third_party_libraries/DynamixelSDK)
-add_subdirectory(third_party_libraries/dynamixel-workbench)
+# NOTE(breakds): pkgconfig will handle the third party dependencies as long as
+# they are installed, so we don't have to put them here in add_subdirectory.
+
+# add_subdirectory(third_party_libraries/DynamixelSDK)
+# add_subdirectory(third_party_libraries/dynamixel-workbench)
 
 find_package(yaml-cpp REQUIRED)
 
