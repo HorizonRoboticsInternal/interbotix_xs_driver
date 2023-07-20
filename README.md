@@ -14,9 +14,21 @@ This package can be used as a [standalone C++ library](#using-standalone-c-libra
 
 ## Installation
 
-This package is known to build on Ubuntu 20.04. No other configuration or environment has been tested and is not supported, though it will probably work on other distributions of Ubuntu.
+### Using Standalone C++ Library (Nix)
+
+As long as your OS has access to `nix`, building from source is as simple as
+
+```sh
+nix develop
+mkdir build
+cd build
+cmake ..
+make
+```
 
 ### Using Standalone C++ Library
+
+This package is known to build on Ubuntu 20.04. No other configuration or environment has been tested and is not supported, though it will probably work on other distributions of Ubuntu.
 
 #### Required Dependencies
 
