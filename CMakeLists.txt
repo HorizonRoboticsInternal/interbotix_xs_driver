@@ -43,6 +43,38 @@ target_link_libraries(${PROJECT_NAME}
   ${DEPENDENCIES}
 )
 
+
+# Arm server:
+find_package(spdlog REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
+add_library(protocols INTERFACE)
+target_sources(protocols INTERFACE src/protocols.h)
+target_link_libraries(protocols INTERFACE nlohmann_json::nlohmann_json)
+
+# +----------------------------------------+
+# | The UDP-based Server                   |
+# +----------------------------------------+
+
+add_library(udp_daemon STATIC)
+target_include_directories(udp_daemon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_sources(udp_daemon
+    PUBLIC src/udp_daemon.h
+    PRIVATE src/udp_daemon.cpp)
+target_link_libraries(udp_daemon PUBLIC
+    ${PROJECT_NAME}  # interbotix_xs_driver
+    protocols
+    spdlog::spdlog)
+
+add_executable(udp_client)
+target_sources(udp_client PRIVATE src/udp_client.cpp)
+
+add_executable(wx_serverd)
+target_include_directories(wx_serverd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_sources(wx_serverd PRIVATE src/wx_serverd.cpp)
+target_link_libraries(wx_serverd PRIVATE udp_daemon spdlog::spdlog)
+
+
 install(
   TARGETS ${PROJECT_NAME}
   EXPORT "export_${PROJECT_NAME}"
