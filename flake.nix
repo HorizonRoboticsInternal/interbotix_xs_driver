@@ -40,6 +40,10 @@
           yaml-cpp
           DynamixelSDK
           dynamixel-workbench
+          spdlog
+          boost
+          websocketpp
+          nlohmann_json
         ];
 
         shellHook = ''
