@@ -30,7 +30,7 @@
 # Each motor's configs are grouped under the name of the joint the motor is controlling. The names are defined at
 # http://support.interbotix.com/ under the 'Specifications' section. (Click a robot and scroll down to the 'Default Joint Limits' section.)
 
-port: /dev/ttyDXL
+port: /dev/ttyUSB0
 
 joint_order: [waist, shoulder, elbow, forearm_roll, wrist_angle, wrist_rotate, gripper]
 sleep_positions: [0, -1.80, 1.55, 0, 0.8, 0, 0]
