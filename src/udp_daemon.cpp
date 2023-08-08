@@ -117,38 +117,42 @@ namespace horizon::widowx
       }
       boost::system::error_code error;
       char data[2048];
-      std::vector<float> positions(7);
-      std::vector<float> velocities(7);
-      std::vector<float> efforts(7);
+      const uint N_JOINTS = 8;
+      std::vector<float> positions(N_JOINTS);
+      std::vector<float> velocities(N_JOINTS);
+      std::vector<float> efforts(N_JOINTS);
       bool succ = arm_low_->get_joint_states(
           "all", &positions, &velocities, &efforts);
       assert(succ);
 
       std::sprintf(data,
-                    "%.8f %.8f %.8f %.8f %.8f %.8f %.8f "
-                    "%.8f %.8f %.8f %.8f %.8f %.8f %.8f "
-                    "%.8f %.8f %.8f %.8f %.8f %.8f %.8f",
-                    positions[0],
-                    positions[1],
-                    positions[2],
-                    positions[3],
-                    positions[4],
-                    positions[5],
-                    positions[6],
-                    velocities[0],
-                    velocities[1],
-                    velocities[2],
-                    velocities[3],
-                    velocities[4],
-                    velocities[5],
-                    velocities[6],
-                    efforts[0],
-                    efforts[1],
-                    efforts[2],
-                    efforts[3],
-                    efforts[4],
-                    efforts[5],
-                    efforts[6]);
+                   "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f "
+                   "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f "
+                   "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f",
+                   positions[0],
+                   positions[1],
+                   positions[2],
+                   positions[3],
+                   positions[4],
+                   positions[5],
+                   positions[6],
+                   positions[7],
+                   velocities[0],
+                   velocities[1],
+                   velocities[2],
+                   velocities[3],
+                   velocities[4],
+                   velocities[5],
+                   velocities[6],
+                   velocities[7],
+                   efforts[0],
+                   efforts[1],
+                   efforts[2],
+                   efforts[3],
+                   efforts[4],
+                   efforts[5],
+                   efforts[6],
+                   efforts[7]);
       int ret = socket_.send_to(
           boost::asio::buffer(std::string(data)), listener_endpoint_, 0, error);
       std::this_thread::sleep_for(std::chrono::milliseconds(ms));
