@@ -212,6 +212,28 @@ namespace horizon::widowx
         filepath_motor_configs_, filepath_mode_configs_, write_eeprom_on_startup, logging_level);
 
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    // reboot all motors just to be sure:
+    arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true,
+    false);
+    // arm_low_->write_joint_command("elbow", 1.2);
+    arm_low_->write_position_commands("arm", {0, -1.80, 1.2, 0, 0.8, 0, 0});
+    for (int i = 0; i < 10; ++i) {
+      nlohmann::json status = GetStatus();
+      spdlog::info("wx_serverd: cmd 1.2: Status Dump: {}", status.dump());
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    sleep(5);
+
+    // arm_low_->write_joint_command("elbow", 1.5);
+    arm_low_->write_position_commands("arm", {0, -1.80, 1.5, 0, 0.8, 0, 0.5});
+    for (int i = 0; i < 10; ++i) {
+      nlohmann::json status = GetStatus();
+      spdlog::info("wx_serverd: cmd 1.5: Status Dump: {}", status.dump());
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    sleep(100);
+
     std::unique_ptr<UDPPusher> pusher;
 
     // The messages should be very small, so the buffer size is sufficient.

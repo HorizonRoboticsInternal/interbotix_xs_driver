@@ -685,6 +685,10 @@ bool InterbotixDriverXS::get_joint_states(
 {
   read_joint_states();
   std::lock_guard<std::mutex> guard(_mutex_js);
+  if (positions && positions->size() > 0) positions->clear();
+  if (velocities && velocities->size() > 0) velocities->clear();
+  if (effort && effort->size() > 0) effort->clear();
+
   for (const auto & joint_name : get_group_info(name)->joint_names) {
     // iterate through each joint in group, reading pos, vel, and eff
     if (positions) {
