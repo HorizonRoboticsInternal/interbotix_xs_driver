@@ -206,36 +206,15 @@ namespace horizon::widowx
     }
 
     bool write_eeprom_on_startup = true;
-    std::string logging_level = "DEBUG";
+    std::string logging_level = "INFO";
 
     arm_low_ = std::make_unique<InterbotixDriverXS>(
         filepath_motor_configs_, filepath_mode_configs_, write_eeprom_on_startup, logging_level);
-
+    // reboot all motors for the arm to work properly:
+    arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true, false);
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
-    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-    // reboot all motors just to be sure:
-    arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true,
-    false);
-    // arm_low_->write_joint_command("elbow", 1.2);
-    arm_low_->write_position_commands("arm", {0, -1.80, 1.2, 0, 0.8, 0, 0});
-    for (int i = 0; i < 10; ++i) {
-      nlohmann::json status = GetStatus();
-      spdlog::info("wx_serverd: cmd 1.2: Status Dump: {}", status.dump());
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    sleep(5);
-
-    // arm_low_->write_joint_command("elbow", 1.5);
-    arm_low_->write_position_commands("arm", {0, -1.80, 1.5, 0, 0.8, 0, 0.5});
-    for (int i = 0; i < 10; ++i) {
-      nlohmann::json status = GetStatus();
-      spdlog::info("wx_serverd: cmd 1.5: Status Dump: {}", status.dump());
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    sleep(100);
 
     std::unique_ptr<UDPPusher> pusher;
-
     // The messages should be very small, so the buffer size is sufficient.
     char data[2048];
     size_t content_size = 0;
@@ -264,14 +243,19 @@ namespace horizon::widowx
         nlohmann::json bounds = GetBounds();
         socket_->send_to(boost::asio::buffer(bounds.dump()), sender_endpoint);
       } else if (std::strncmp(data, CMD_SETPOS, 6) == 0) {
+        auto start = std::chrono::high_resolution_clock::now();
         std::vector<float> positions = ParseArray(data + 7, content_size - 7);
         // TODO(breakds): Check positions has 7 numbers.
         SetPosition(positions);
         // read after 15ms wait, to give policy 2ms, network 1ms and 2ms buffer time.
         if (sync_mode_) {
           for (int i = 0; i < 1; ++i) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(15));
-            pusher->GetStatusAndSend(0);
+            // std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            pusher->GetStatusAndSend(0);  // blocks for 0ms
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> diff = end - start;
+            if (diff.count() > 0.02)
+              std::cout << "UDPDaemon: send & receive took too long: " << diff.count() << " seconds" << std::endl;
           }
         }
       } else if (std::strncmp(data, CMD_LISTEN, 6) == 0) {

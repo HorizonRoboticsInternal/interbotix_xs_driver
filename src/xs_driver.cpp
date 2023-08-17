@@ -424,13 +424,16 @@ bool InterbotixDriverXS::write_commands(
         mode.c_str(),
         dynamixel_commands[i]);
     }
+    const char *log = NULL;
     // write position commands
     dxl_wb.syncWrite(
       SYNC_WRITE_HANDLER_FOR_GOAL_POSITION,
       get_group_info(name)->joint_ids.data(),
       get_group_info(name)->joint_num,
       &dynamixel_commands[0],
-      1);
+      1,
+      &log);
+    // if (log) XSLOG_INFO("syncWrite log: %s", log);
   } else if (mode == mode::VELOCITY) {
     // velocity commands case
     for (size_t i{0}; i < commands.size(); i++) {
@@ -1277,10 +1280,6 @@ void InterbotixDriverXS::init_operating_modes()
 
 void InterbotixDriverXS::read_joint_states()
 {
-  std::lock_guard<std::mutex> guard(_mutex_js);
-  robot_positions.clear();
-  robot_velocities.clear();
-  robot_efforts.clear();
   const char * log;
 
   std::vector<int32_t> get_current(all_ptr->joint_num, 0);
@@ -1337,6 +1336,13 @@ void InterbotixDriverXS::read_joint_states()
       XSLOG_ERROR("%s", log);
     }
 
+    // Duplicate code here on clearing the robot_ buffers, so
+    // we lock for as short duration as possible.
+    std::lock_guard<std::mutex> guard(_mutex_js);
+    robot_positions.clear();
+    robot_velocities.clear();
+    robot_efforts.clear();
+
     uint8_t index = 0;
     for (auto const & id : all_ptr->joint_ids) {
       float position = 0;
@@ -1356,10 +1362,16 @@ void InterbotixDriverXS::read_joint_states()
       index++;
     }
   } else if (dxl_wb.getProtocolVersion() == 1.0f) {
+    XSLOG_INFO("Dynamixel Workbench Protocol Version 1.0");
     uint16_t length_of_data = control_items["Present_Position"]->data_length +
       control_items["Present_Velocity"]->data_length +
       control_items["Present_Current"]->data_length;
     std::vector<uint32_t> get_all_data(length_of_data, 0);
+
+    std::lock_guard<std::mutex> guard(_mutex_js);
+    robot_positions.clear();
+    robot_velocities.clear();
+    robot_efforts.clear();
 
     for (auto const & id : all_ptr->joint_ids) {
       if (!dxl_wb.readRegister(
