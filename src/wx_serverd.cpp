@@ -29,7 +29,7 @@ T GetEnv(const char *name, T default_value) {
 }
 
 int main(int argc, char**argv) {
-  int sync = 0;
+  int sync = 1;
   if (argc > 1)
     sync = atoi(argv[1]);
   UDPDaemon daemon(GetEnv<int>("WX_PORT", 9211), (bool) sync);

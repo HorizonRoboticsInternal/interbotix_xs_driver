@@ -97,7 +97,10 @@ namespace horizon::widowx
         GetStatusAndSend(0); // initial send
         while (true)
         {
-          GetStatusAndSend(sync_mode_ ? -1 : 1);
+          if (sync_mode_)
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+          else
+            GetStatusAndSend(0);
           if (kill_.load())
           {
             break;
@@ -112,7 +115,6 @@ namespace horizon::widowx
       if (ms < 0)
       {
         // disable reading
-        sleep(10);
         return;
       }
       boost::system::error_code error;
@@ -247,15 +249,10 @@ namespace horizon::widowx
         std::vector<float> positions = ParseArray(data + 7, content_size - 7);
         // TODO(breakds): Check positions has 7 numbers.
         SetPosition(positions);
-        // read after 15ms wait, to give policy 2ms, network 1ms and 2ms buffer time.
+        // read after no wait, as reading takes 16ms
         if (sync_mode_) {
           for (int i = 0; i < 1; ++i) {
-            // std::this_thread::sleep_for(std::chrono::milliseconds(15));
             pusher->GetStatusAndSend(0);  // blocks for 0ms
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> diff = end - start;
-            if (diff.count() > 0.02)
-              std::cout << "UDPDaemon: send & receive took too long: " << diff.count() << " seconds" << std::endl;
           }
         }
       } else if (std::strncmp(data, CMD_LISTEN, 6) == 0) {
