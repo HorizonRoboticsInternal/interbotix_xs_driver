@@ -45,24 +45,25 @@ namespace horizon::widowx
               int port,
               bool sync = false)
         : arm_low_(arm_low), address_(address), port_(port), sync_mode_(sync),
-          socket_(io_service_), thread_([this]()
-                                        { Run(); })
+          socket_(io_service_)
     {
+      if (!sync_mode_)
+        thread_ = std::make_unique<std::thread>([this]() { Run(); });
+      udp::resolver resolver(io_service_);
+      listener_endpoint_ =
+          *resolver.resolve({udp::v4(), address_, std::to_string(port_)}).begin();
+      socket_.open(udp::v4());
     }
 
     ~UDPPusher()
     {
       kill_.store(true);
-      thread_.join();
+      socket_.close();
+      if (thread_) thread_->join();
     }
 
     void Run()
     {
-      udp::resolver resolver(io_service_);
-      listener_endpoint_ =
-          *resolver.resolve({udp::v4(), address_, std::to_string(port_)}).begin();
-      socket_.open(udp::v4());
-
       boost::system::error_code error;
       char data[2048];
 
@@ -97,17 +98,13 @@ namespace horizon::widowx
         GetStatusAndSend(0); // initial send
         while (true)
         {
-          if (sync_mode_)
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
-          else
-            GetStatusAndSend(0);
+          GetStatusAndSend(2);
           if (kill_.load())
           {
             break;
           }
         }
       }
-      socket_.close();
     }
 
     void GetStatusAndSend(int ms = 1)
@@ -169,7 +166,7 @@ namespace horizon::widowx
     boost::asio::io_service io_service_;
     udp::endpoint listener_endpoint_;
     udp::socket socket_;
-    std::thread thread_;
+    std::unique_ptr<std::thread> thread_;
     std::atomic<bool> kill_{false};
   };
 
@@ -214,6 +211,9 @@ namespace horizon::widowx
         filepath_motor_configs_, filepath_mode_configs_, write_eeprom_on_startup, logging_level);
     // reboot all motors for the arm to work properly:
     arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true, false);
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {200, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {30, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {3, 0, 1, 0, 0, 0, 0});
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
 
     std::unique_ptr<UDPPusher> pusher;
@@ -250,11 +250,13 @@ namespace horizon::widowx
         // TODO(breakds): Check positions has 7 numbers.
         SetPosition(positions);
         // read after no wait, as reading takes 16ms
-        if (sync_mode_) {
+        if (sync_mode_ && pusher) {
           for (int i = 0; i < 1; ++i) {
             pusher->GetStatusAndSend(0);  // blocks for 0ms
           }
         }
+        if (sync_mode_ && !pusher)
+          spdlog::error("Sync mode client should send LISTEN before SETPOS!");
       } else if (std::strncmp(data, CMD_LISTEN, 6) == 0) {
         std::string listener_address = sender_endpoint.address().to_string();
         int listener_port            = std::stoi(std::string(data + 7, content_size - 7));
