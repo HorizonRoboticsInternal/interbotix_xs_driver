@@ -211,12 +211,11 @@ namespace horizon::widowx
         filepath_motor_configs_, filepath_mode_configs_, write_eeprom_on_startup, logging_level);
     // reboot all motors for the arm to work properly:
     arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true, false);
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {50, 0, 1, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {100, 0, 0, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {500, 0, 0, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {300, 0, 0, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {30, 0, 0, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {50, 0, 5, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {100, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {500, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {300, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {100, 0, 0, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {50, 0, 0, 0, 0, 0, 0});
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
 
     std::unique_ptr<UDPPusher> pusher;
