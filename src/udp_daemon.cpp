@@ -211,9 +211,12 @@ namespace horizon::widowx
         filepath_motor_configs_, filepath_mode_configs_, write_eeprom_on_startup, logging_level);
     // reboot all motors for the arm to work properly:
     arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true, false);
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {200, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {30, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {3, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {50, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {100, 0, 0, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {500, 0, 0, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {300, 0, 0, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {30, 0, 0, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {50, 0, 5, 0, 0, 0, 0});
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
 
     std::unique_ptr<UDPPusher> pusher;
@@ -222,11 +225,13 @@ namespace horizon::widowx
     size_t content_size = 0;
 
     while (true) {
+      auto start = std::chrono::high_resolution_clock::now();
       udp::endpoint sender_endpoint;
       // Below is a blocking call that returns as soon as there is data in. The
       // information about the sender is stored in the sneder_endpoint and the
       // message content will be in data.
       try {
+        // This receive_from blocks if no command is sent.
         // auto start = std::chrono::high_resolution_clock::now();
         content_size = socket_->receive_from(boost::asio::buffer(data), sender_endpoint);
         // auto end = std::chrono::high_resolution_clock::now();
@@ -245,12 +250,23 @@ namespace horizon::widowx
         nlohmann::json bounds = GetBounds();
         socket_->send_to(boost::asio::buffer(bounds.dump()), sender_endpoint);
       } else if (std::strncmp(data, CMD_SETPOS, 6) == 0) {
-        auto start = std::chrono::high_resolution_clock::now();
         std::vector<float> positions = ParseArray(data + 7, content_size - 7);
         // TODO(breakds): Check positions has 7 numbers.
+        // This SetPosition is instantaneous.
         SetPosition(positions);
-        // read after no wait, as reading takes 16ms
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diff = end - start;
+        if (diff.count() > 0.005)
+          std::cout << "UDPDaemon: setpos overall took too long: " << diff.count() << " seconds" << std::endl;
         if (sync_mode_ && pusher) {
+          // Use 5ms down time for more detailed readings.
+          int dt = 20;  // 5 or 20.
+          // sleep a bit before reading to make sure whole cycle is < 20ms,
+          // and also give udp_client ~2ms to receive and store the states.
+          // TODO(lezh): decrease sleep time if control is across wifi.
+          int sleep = dt - 3 - 2;
+          if (sleep > 0)
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
           for (int i = 0; i < 1; ++i) {
             pusher->GetStatusAndSend(0);  // blocks for 0ms
           }
