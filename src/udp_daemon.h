@@ -24,7 +24,8 @@ class UDPDaemon {
   static constexpr char CMD_SETPOS[] = "SETPOS";
   static constexpr char CMD_LISTEN[] = "LISTEN";
 
-  explicit UDPDaemon(int port, bool sync=false, std::string filepath_motor_configs="",
+  explicit UDPDaemon(int port, bool sync=false, int kp=50,
+                     std::string filepath_motor_configs="",
                      std::string filepath_mode_configs="");
 
   void Start();
@@ -53,6 +54,7 @@ class UDPDaemon {
   std::unique_ptr<InterbotixDriverXS> arm_low_;
   std::string filepath_motor_configs_, filepath_mode_configs_;
   bool sync_mode_ = false;
+  int kp_;
 };
 
 }  // namespace widowx

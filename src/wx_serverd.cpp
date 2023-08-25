@@ -32,7 +32,10 @@ int main(int argc, char**argv) {
   int sync = 1;
   if (argc > 1)
     sync = atoi(argv[1]);
-  UDPDaemon daemon(GetEnv<int>("WX_PORT", 9211), (bool) sync);
+  int kp = 50;
+  if (argc > 2)
+    kp = atoi(argv[2]);
+  UDPDaemon daemon(GetEnv<int>("WX_PORT", 9211), (bool) sync, kp);
 
   if (GetEnv<bool>("WXD_MOCK", false)) {
     // Run in mock mode

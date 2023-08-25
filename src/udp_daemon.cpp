@@ -47,12 +47,12 @@ namespace horizon::widowx
         : arm_low_(arm_low), address_(address), port_(port), sync_mode_(sync),
           socket_(io_service_)
     {
-      if (!sync_mode_)
-        thread_ = std::make_unique<std::jthread>(&horizon::widowx::UDPPusher::Run, this);
       udp::resolver resolver(io_service_);
       listener_endpoint_ =
           *resolver.resolve({udp::v4(), address_, std::to_string(port_)}).begin();
       socket_.open(udp::v4());
+      if (!sync_mode_)
+        thread_ = std::make_unique<std::jthread>(&horizon::widowx::UDPPusher::Run, this);
     }
 
     ~UDPPusher()
@@ -170,9 +170,11 @@ namespace horizon::widowx
 
   UDPDaemon::UDPDaemon(int port,
                        bool sync,
+                       int kp,
                        std::string filepath_motor_configs,
                        std::string filepath_mode_configs)
-      : port_(port), sync_mode_(sync), filepath_motor_configs_(filepath_motor_configs),
+      : port_(port), sync_mode_(sync), kp_(kp),
+        filepath_motor_configs_(filepath_motor_configs),
         filepath_mode_configs_(filepath_mode_configs) {
     if (filepath_motor_configs == "" || filepath_mode_configs == "")
     {
@@ -209,14 +211,14 @@ namespace horizon::widowx
         filepath_motor_configs_, filepath_mode_configs_, write_eeprom_on_startup, logging_level);
     // reboot all motors for the arm to work properly:
     arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true, false);
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {800, 0, 16, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {800, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {800, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {800, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {800, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_angle", {800, 0, 1, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {800*3/5, 0, 0, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {100, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {kp_, 0, 1, 0, 0, 0, 0});
+    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {800, 0, 1, 0, 0, 0, 0});
+    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {800, 0, 1, 0, 0, 0, 0});
+    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {800, 0, 1, 0, 0, 0, 0});
+    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {800, 0, 1, 0, 0, 0, 0});
+    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_angle", {800, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {6400*3/5, 0, 0, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {6400, 0, 16, 0, 0, 0, 0});
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
 
     std::unique_ptr<UDPPusher> pusher;
@@ -257,7 +259,7 @@ namespace horizon::widowx
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> diff = end - start;
         if (diff.count() > 0.005)
-          std::cout << "UDPDaemon: setpos overall took too long: " << diff.count() << " seconds" << std::endl;
+          spdlog::info("UDPDaemon: recv cmd & setpos overall took long: {}", diff.count());
         if (sync_mode_ && pusher) {
           // Use 5ms down time for more detailed readings.
           int dt = 20;  // 5 or 20.
