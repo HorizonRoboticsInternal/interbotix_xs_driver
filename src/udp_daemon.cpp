@@ -212,13 +212,13 @@ namespace horizon::widowx
     // reboot all motors for the arm to work properly:
     arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true, false);
     arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {kp_, 0, 1, 0, 0, 0, 0});
-    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {800, 0, 1, 0, 0, 0, 0});
-    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {800, 0, 1, 0, 0, 0, 0});
-    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {800, 0, 1, 0, 0, 0, 0});
-    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {800, 0, 1, 0, 0, 0, 0});
-    // // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_angle", {800, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {6400*3/5, 0, 0, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {6400, 0, 16, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {kp_, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {kp_, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {kp_, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {kp_, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_angle", {kp_, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {300, 0, 0, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {300, 0, 0, 0, 0, 0, 0});
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
 
     std::unique_ptr<UDPPusher> pusher;
@@ -263,10 +263,12 @@ namespace horizon::widowx
         if (sync_mode_ && pusher) {
           // Use 5ms down time for more detailed readings.
           int dt = 20;  // 5 or 20.
-          // sleep a bit before reading to make sure whole cycle is < 20ms,
-          // and also give udp_client ~2ms to receive and store the states.
-          // TODO(lezh): decrease sleep time if control is across wifi.
-          int sleep = dt - 3 - 2;
+          // sleep a bit before reading to make sure
+          // 1) the reading is as recent as possible,
+          // 2) the whole cycle is < 20ms, and
+          // 3) add 4ms buffer time, in case arm state reading or udp_client is slow to receive.
+          // TODO(lezh): further reduce sleep time if control is across wifi.
+          int sleep = dt - 3 - 4;
           if (sleep > 0)
             std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
           for (int i = 0; i < 1; ++i) {
