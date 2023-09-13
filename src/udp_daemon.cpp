@@ -212,13 +212,13 @@ namespace horizon::widowx
     // reboot all motors for the arm to work properly:
     arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true, false);
     arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {kp_, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {kp_, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {kp_, 0, 1, 0, 0, 0, 0});
     // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {kp_, 0, 1, 0, 0, 0, 0});
     // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {kp_, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {kp_, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_angle", {kp_, 0, 1, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {300, 0, 0, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {300, 0, 0, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {kp_, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_angle", {kp_, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {500, 0, 0, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {400, 0, 0, 0, 0, 0, 0});
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
 
     std::unique_ptr<UDPPusher> pusher;
@@ -258,7 +258,7 @@ namespace horizon::widowx
         SetPosition(positions);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> diff = end - start;
-        if (diff.count() > 0.005)
+        if (diff.count() > 0.008)
           spdlog::info("UDPDaemon: recv cmd & setpos overall took long: {}", diff.count());
         if (sync_mode_ && pusher) {
           // Use 5ms down time for more detailed readings.

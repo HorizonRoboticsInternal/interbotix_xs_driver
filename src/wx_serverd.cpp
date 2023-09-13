@@ -32,7 +32,7 @@ int main(int argc, char**argv) {
   int sync = 1;
   if (argc > 1)
     sync = atoi(argv[1]);
-  int kp = 400;
+  int kp = 500;
   if (argc > 2)
     kp = atoi(argv[2]);
   UDPDaemon daemon(GetEnv<int>("WX_PORT", 9211), (bool) sync, kp);
