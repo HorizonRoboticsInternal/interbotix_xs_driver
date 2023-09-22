@@ -25,12 +25,13 @@ class UDPDaemon {
   static constexpr char CMD_LISTEN[] = "LISTEN";
 
   explicit UDPDaemon(int port, bool sync=false, int kp=50,
+                     int dt=20,
                      std::string filepath_motor_configs="",
                      std::string filepath_mode_configs="");
 
   void Start();
 
-  // This does not actually connect to the Sagittarius robotic arm and
+  // This does not actually connect to the WidowX robotic arm and
   // is useful for testing UDP networking.
   void StartMock();
 
@@ -55,6 +56,9 @@ class UDPDaemon {
   std::string filepath_motor_configs_, filepath_mode_configs_;
   bool sync_mode_ = false;
   int kp_;
+  // 5ms for fast response calibration, or 20ms for whole body deploy,
+  // or 100ms for arm only agent deploy.
+  int dt_;
 };
 
 }  // namespace widowx

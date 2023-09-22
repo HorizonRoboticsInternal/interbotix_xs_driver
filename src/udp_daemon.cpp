@@ -171,9 +171,10 @@ namespace horizon::widowx
   UDPDaemon::UDPDaemon(int port,
                        bool sync,
                        int kp,
+                       int dt,
                        std::string filepath_motor_configs,
                        std::string filepath_mode_configs)
-      : port_(port), sync_mode_(sync), kp_(kp),
+      : port_(port), sync_mode_(sync), kp_(kp), dt_(dt),
         filepath_motor_configs_(filepath_motor_configs),
         filepath_mode_configs_(filepath_mode_configs) {
     if (filepath_motor_configs == "" || filepath_mode_configs == "")
@@ -261,14 +262,12 @@ namespace horizon::widowx
         if (diff.count() > 0.008)
           spdlog::info("UDPDaemon: recv cmd & setpos overall took long: {}", diff.count());
         if (sync_mode_ && pusher) {
-          // Use 5ms down time for more detailed readings.
-          int dt = 20;  // 5 or 20.
           // sleep a bit before reading to make sure
           // 1) the reading is as recent as possible,
           // 2) the whole cycle is < 20ms, and
           // 3) add 4ms buffer time, in case arm state reading or udp_client is slow to receive.
           // TODO(lezh): further reduce sleep time if control is across wifi.
-          int sleep = dt - 3 - 4;
+          int sleep = dt_ - 3 - 4;
           if (sleep > 0)
             std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
           for (int i = 0; i < 1; ++i) {
