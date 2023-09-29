@@ -122,11 +122,15 @@ namespace horizon::widowx
       bool succ = arm_low_->get_joint_states(
           "all", &positions, &velocities, &efforts);
       assert(succ);
+      auto currentTime = std::chrono::high_resolution_clock::now();
+      auto curr_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        currentTime.time_since_epoch()).count();
 
       std::sprintf(data,
                    "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f "
                    "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f "
-                   "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f",
+                   "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f "
+                   "%ld",
                    positions[0],
                    positions[1],
                    positions[2],
@@ -150,7 +154,8 @@ namespace horizon::widowx
                    efforts[4],
                    efforts[5],
                    efforts[6],
-                   efforts[7]);
+                   efforts[7],
+                   curr_ms);
       int ret = socket_.send_to(
           boost::asio::buffer(std::string(data)), listener_endpoint_, 0, error);
       std::this_thread::sleep_for(std::chrono::milliseconds(ms));
@@ -213,13 +218,13 @@ namespace horizon::widowx
     // reboot all motors for the arm to work properly:
     arm_low_->reboot_motors(interbotix_xs::cmd_type::GROUP, "all", true, false);
     arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::GROUP, "all", {kp_, 0, 1, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {kp_, 0, 1, 0, 0, 0, 0});
-    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {kp_, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "waist", {kp_, 0, 1, 0, 0, 0, 0});
+    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "shoulder", {400, 0, 1, 0, 0, 0, 0});
     // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "elbow", {kp_, 0, 1, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {kp_, 0, 1, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_angle", {kp_, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "forearm_roll", {kp_, 0, 1, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_angle", {kp_, 0, 1, 0, 0, 0, 0});
     arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "wrist_rotate", {500, 0, 0, 0, 0, 0, 0});
-    arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {kp_, 0, 0, 0, 0, 0, 0});
+    // arm_low_->set_motor_pid_gains(interbotix_xs::cmd_type::SINGLE, "gripper", {kp_, 0, 0, 0, 0, 0, 0});
     spdlog::info("UDP Daemon for WidowX 250s Arm started successfully.");
 
     std::unique_ptr<UDPPusher> pusher;
@@ -259,15 +264,16 @@ namespace horizon::widowx
         SetPosition(positions);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> diff = end - start;
-        if (diff.count() > 0.008)
+        const uint buffer_ms = 7;
+        if (diff.count() > 0.006 + buffer_ms * 0.001)
           spdlog::info("UDPDaemon: recv cmd & setpos overall took long: {}", diff.count());
         if (sync_mode_ && pusher) {
           // sleep a bit before reading to make sure
           // 1) the reading is as recent as possible,
           // 2) the whole cycle is < 20ms, and
-          // 3) add 4ms buffer time, in case arm state reading or udp_client is slow to receive.
+          // 3) add buffer_ms time, in case arm state reading or udp_client is slow to receive.
           // TODO(lezh): further reduce sleep time if control is across wifi.
-          int sleep = dt_ - 3 - 4;
+          int sleep = dt_ - 3 - buffer_ms;
           if (sleep > 0)
             std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
           for (int i = 0; i < 1; ++i) {
