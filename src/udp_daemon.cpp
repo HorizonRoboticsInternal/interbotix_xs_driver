@@ -299,11 +299,11 @@ namespace horizon::widowx
         // This warns if reading delay is above 6ms + max_motor_ms.
         if (diff.count() > (6 + est_comm_ms + est_inf_comm_ms) * 0.001)
           // This means reading delay is large.
-          spdlog::info("UDPDaemon: recv cmd & setpos overall took long: {}", diff.count());
+          spdlog::info("UDPDaemon: recv cmd took long: {}", diff.count());
         if (diff.count() < est_comm_ms * 3e-5)
           // Recv cmd is too fast, cmd has already arrived when we are receiving.
           // There is probably extra command delay.
-          spdlog::info("UDPDaemon: recv cmd & setpos overall too short: {}", diff.count());
+          spdlog::info("UDPDaemon: recv cmd too short: {}", diff.count());
         if (sync_mode_ && pusher) {
           // max_motor_ms is the maximium amount of time wx motor read or write can take.
           // Due to daisy chaining, the max time can be much more than 1ms.
