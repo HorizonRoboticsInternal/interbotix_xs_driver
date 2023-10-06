@@ -233,6 +233,30 @@ namespace horizon::widowx
     size_t content_size = 0;
 
     while (true) {
+      /* Control flow timeline:
+
+      | Time (ms)  |       Client Activities      |         Server Activities          |
+      |------------|------------------------------|------------------------------------|
+      |     0      | Receive Robot Obs. (1ms)     | (Wait for Command)                 |
+      |     1      | NN Inference (2ms)           |                                    |
+      |     3      | Send Command (1ms)           | Receive Command (1ms)              |
+      |     4      | Wait Control Downtime (16ms) | Wait for Effect (19ms - 3ms * n)   |
+      |   ...      |                              | Read Robot State #1 (3ms)          |
+      |   ...      |                              | Send to Client (1ms)               |
+      |   ...      |                              | ...                                |
+      |   ...      |                              | Read Robot State #n (3ms)          |
+      |   ...      |                              | Send to Client (1ms)               |
+      |    20      | Receive Robot Obs. (1ms)     | (Wait for Command)                 |
+      |    21      | NN Inference (2ms)           |                                    |
+      |    23      | Send Command (1ms)           | Receive Command (1ms)              |
+      |    ...     | ...[Next Loop Activities]... | ...[Next Server Activities]...     |
+
+      NOTE: Sending robot state to the client via udp does not block the server.
+      Set command to the motors is instantaneous, and ignored from the diagram.
+
+      The start time below can be between 0ms to 3ms, because Wait for Command can
+      start anywhere from 0ms to 3ms without affecting command or obs latency.
+      */
       auto start = std::chrono::high_resolution_clock::now();
       udp::endpoint sender_endpoint;
       // Below is a blocking call that returns as soon as there is data in. The
@@ -264,20 +288,35 @@ namespace horizon::widowx
         SetPosition(positions);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> diff = end - start;
-        const uint buffer_ms = 7;
-        if (diff.count() > 0.006 + buffer_ms * 0.001)
+        // Buffer time in ms to make sure the client can get the most recent reading
+        // in time for control to happen, but also w/o delaying command receiving.
+        const uint buffer_ms = 12;
+        // Estimated inference + send command time in ms.
+        // TODO(lezh): increase send command time if control is across wifi.
+        const uint est_inf_comm_ms = 3;
+        // Shouldn't take more than est_inf_comm_ms to receive command.
+        // Slightly relaxed by adding 3ms to it.
+        if (diff.count() > 0.003 + est_inf_comm_ms * 0.001)
           spdlog::info("UDPDaemon: recv cmd & setpos overall took long: {}", diff.count());
         if (sync_mode_ && pusher) {
-          // sleep a bit before reading to make sure
-          // 1) the reading is as recent as possible,
-          // 2) the whole cycle is < 20ms, and
-          // 3) add buffer_ms time, in case arm state reading or udp_client is slow to receive.
-          // TODO(lezh): further reduce sleep time if control is across wifi.
-          int sleep = dt_ - 3 - buffer_ms;
-          if (sleep > 0)
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
-          for (int i = 0; i < 1; ++i) {
+          // max_motor_ms is the maximium amount of time wx motor read or write can take.
+          // Due to daisy chaining, the max time can be much more than 1ms.
+          const uint max_motor_ms = 6;
+          // Sleep before reading to make sure command set is all done,
+          // otherwise conflicts arise.
+          // NOTE: for agent high level control, dt_ is 100ms, so we can sleep for longer.
+          auto sleep_time = dt_ - est_inf_comm_ms - 3 * max_motor_ms;
+          sleep_time = std::max(sleep_time, max_motor_ms);
+          std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
+          bool has_enough_time_to_read = true;
+          while (has_enough_time_to_read) {
             pusher->GetStatusAndSend(0);  // blocks for 0ms
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> diff = end - start;
+            // We allow max_motor_ms of reading time, which can overlap with inference and command sending.
+            // NOTE: dt_ - est_inf_comm_ms because start time can be anywhere from 0ms to est_inf_comm_ms.
+            has_enough_time_to_read =
+              dt_ - est_inf_comm_ms - diff.count() * 1000 > max_motor_ms - est_inf_comm_ms;
           }
         }
         if (sync_mode_ && !pusher)
