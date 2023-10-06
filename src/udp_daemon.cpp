@@ -286,37 +286,47 @@ namespace horizon::widowx
         // TODO(breakds): Check positions has 7 numbers.
         // This SetPosition is instantaneous.
         SetPosition(positions);
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> diff = end - start;
-        // Buffer time in ms to make sure the client can get the most recent reading
-        // in time for control to happen, but also w/o delaying command receiving.
-        const uint buffer_ms = 12;
+        auto end_cmd = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diff = end_cmd - start;
+        // TODO(lezh): increase est_comm_ms if control is across wifi.
+        const uint est_comm_ms = 1;
+        const uint est_inf_ms = 2;
         // Estimated inference + send command time in ms.
-        // TODO(lezh): increase send command time if control is across wifi.
-        const uint est_inf_comm_ms = 3;
-        // Shouldn't take more than est_inf_comm_ms to receive command.
-        // Slightly relaxed by adding 3ms to it.
-        if (diff.count() > 0.003 + est_inf_comm_ms * 0.001)
+        const uint est_inf_comm_ms = est_comm_ms + est_inf_ms;
+        const uint max_motor_ms = 4;
+        // Shouldn't take more than est_comm_ms (send readings to client) + est_inf_comm_ms
+        // to receive command.  Slightly relaxed by adding 6ms to it.
+        // This warns if reading delay is above 6ms + max_motor_ms.
+        if (diff.count() > (6 + est_comm_ms + est_inf_comm_ms) * 0.001)
+          // This means reading delay is large.
           spdlog::info("UDPDaemon: recv cmd & setpos overall took long: {}", diff.count());
+        if (diff.count() < est_comm_ms * 3e-5)
+          // Recv cmd is too fast, cmd has already arrived when we are receiving.
+          // There is probably extra command delay.
+          spdlog::info("UDPDaemon: recv cmd & setpos overall too short: {}", diff.count());
         if (sync_mode_ && pusher) {
           // max_motor_ms is the maximium amount of time wx motor read or write can take.
           // Due to daisy chaining, the max time can be much more than 1ms.
-          const uint max_motor_ms = 6;
-          // Sleep before reading to make sure command set is all done,
-          // otherwise conflicts arise.
+          // Sleep before reading to make sure command set is all done.
+          // Smaller than 4ms sleep, conflicts arise and arm crashes.
           // NOTE: for agent high level control, dt_ is 100ms, so we can sleep for longer.
-          auto sleep_time = dt_ - est_inf_comm_ms - 3 * max_motor_ms;
-          sleep_time = std::max(sleep_time, max_motor_ms);
+          int sleep_time = dt_ - est_inf_comm_ms - 3 * max_motor_ms;
+          sleep_time = std::max(sleep_time, (int) max_motor_ms);
           std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
           bool has_enough_time_to_read = true;
           while (has_enough_time_to_read) {
-            pusher->GetStatusAndSend(0);  // blocks for 0ms
+            pusher->GetStatusAndSend(0);  // GetStatus blocks for about 3-4 ms
             auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> diff = end - start;
-            // We allow max_motor_ms of reading time, which can overlap with inference and command sending.
-            // NOTE: dt_ - est_inf_comm_ms because start time can be anywhere from 0ms to est_inf_comm_ms.
+            std::chrono::duration<double> since_cmd_set = end - end_cmd;
+            // From end_cmd, within dt_ time, we need to read arm state, send over to client,
+            // then client needs to do inference and send command back, so we are good to read
+            // as long as since_cmd_set < dt_ - max_motor_ms - est_inf_comm_ms - est_comm_ms.
+            // NOTE: We add additional 2ms to the reading time to make readings more recent.
+            // But increasing it further increases the possibility of extra command delay.
+            // Tried 1.5ms with 50hz policy, adds 3ms reading delay.  Tried 3ms, increases cmd delay.
+            // 2ms seems to be a good balance.
             has_enough_time_to_read =
-              dt_ - est_inf_comm_ms - diff.count() * 1000 > max_motor_ms - est_inf_comm_ms;
+              since_cmd_set.count() * 1000 < dt_ - est_inf_comm_ms - max_motor_ms - est_comm_ms + 2;
           }
         }
         if (sync_mode_ && !pusher)
