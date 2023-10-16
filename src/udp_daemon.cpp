@@ -119,13 +119,14 @@ namespace horizon::widowx
       std::vector<float> positions(N_JOINTS);
       std::vector<float> velocities(N_JOINTS);
       std::vector<float> efforts(N_JOINTS);
-      bool succ = arm_low_->get_joint_states(
-          "all", &positions, &velocities, &efforts);
-      assert(succ);
+
       auto currentTime = std::chrono::high_resolution_clock::now();
       auto curr_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         currentTime.time_since_epoch()).count();
 
+      bool succ = arm_low_->get_joint_states(
+          "all", &positions, &velocities, &efforts);
+      assert(succ);
       std::sprintf(data,
                    "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f "
                    "%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f "
@@ -242,10 +243,10 @@ namespace horizon::widowx
       |     3      | Send Command (1ms)           | Receive Command (1ms)              |
       |     4      | Wait Control Downtime (16ms) | Wait for Effect (19ms - 3ms * n)   |
       |   ...      |                              | Read Robot State #1 (3ms)          |
-      |   ...      |                              | Send to Client (1ms)               |
+      |   ...      |                              | [Send to Client (1ms)]             |
       |   ...      |                              | ...                                |
       |   ...      |                              | Read Robot State #n (3ms)          |
-      |   ...      |                              | Send to Client (1ms)               |
+      |   ...      |                              | [Send to Client (1ms)]             |
       |    20      | Receive Robot Obs. (1ms)     | (Wait for Command)                 |
       |    21      | NN Inference (2ms)           |                                    |
       |    23      | Send Command (1ms)           | Receive Command (1ms)              |
