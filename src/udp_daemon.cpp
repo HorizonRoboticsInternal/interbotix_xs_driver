@@ -22,7 +22,7 @@ namespace horizon::widowx
   {
 
     // Convert a string like "1.23 4.5 3.3" into a vector<float> like {1.23, 4.5, 3.3}.
-    std::vector<float> ParseArray(char *text, size_t len)
+    std::vector<float> ParseArray(char *text, size_t len, long long* last_read_ts = NULL)
     {
       std::vector<float> result{};
       char *start = text;
@@ -31,7 +31,11 @@ namespace horizon::widowx
         if (!(std::isdigit(*start) || *start == '.' || *start == '-'))
           continue;
         result.emplace_back(std::strtof(start, &start));
+        if (result.size() == 7)
+          break;
       }
+      if (last_read_ts)
+        *last_read_ts = std::stoll(start);
       return result;
     }
 
@@ -264,6 +268,8 @@ namespace horizon::widowx
       // information about the sender is stored in the sneder_endpoint and the
       // message content will be in data.
       try {
+        // clear data to '\0'
+        std::fill(data, data + 2048, '\0');
         // This receive_from blocks if no command is sent.
         // auto start = std::chrono::high_resolution_clock::now();
         content_size = socket_->receive_from(boost::asio::buffer(data), sender_endpoint);
@@ -283,7 +289,8 @@ namespace horizon::widowx
         nlohmann::json bounds = GetBounds();
         socket_->send_to(boost::asio::buffer(bounds.dump()), sender_endpoint);
       } else if (std::strncmp(data, CMD_SETPOS, 6) == 0) {
-        std::vector<float> positions = ParseArray(data + 7, content_size - 7);
+        long long last_read_ts = 0;
+        std::vector<float> positions = ParseArray(data + 7, content_size - 7, &last_read_ts);
         // TODO(breakds): Check positions has 7 numbers.
         // This SetPosition is instantaneous.
         SetPosition(positions);
@@ -291,17 +298,21 @@ namespace horizon::widowx
         std::chrono::duration<double> diff = end_cmd - start;
         // TODO(lezh): increase est_comm_ms if control is across wifi.
         const uint est_comm_ms = 1;
-        const uint est_inf_ms = 2;
+        uint low_est_inf_ms = 2;  // inference time for low level control
+        uint high_est_inf_ms = 7;  // inference time for agent high level control
         // Estimated inference + send command time in ms.
-        const uint est_inf_comm_ms = est_comm_ms + est_inf_ms;
+        const uint high_est_inf_comm_ms = est_comm_ms + high_est_inf_ms;
         const uint max_motor_ms = 4;
-        // Shouldn't take more than est_comm_ms (send readings to client) + est_inf_comm_ms
+        // Shouldn't take more than est_comm_ms (send readings to client) + high_est_inf_comm_ms
         // to receive command.  Slightly relaxed by adding 6ms to it.
         // This warns if reading delay is above 6ms + max_motor_ms.
-        if (diff.count() > (6 + est_comm_ms + est_inf_comm_ms) * 0.001)
+        if (diff.count() > (6 + est_comm_ms + high_est_inf_comm_ms) * 0.001)
           // This means reading delay is large.
           spdlog::info("UDPDaemon: recv cmd took long: {}", diff.count());
-        if (diff.count() < est_comm_ms * 3e-5)
+        else if (diff.count() > 0.003)
+          // This means we can spend this much more time on reading arm state after set command.
+          spdlog::info("UDPDaemon: recv cmd took slightly long: {}", diff.count());
+        if (diff.count() < 3e-5)
           // Recv cmd is too fast, cmd has already arrived when we are receiving.
           // There is probably extra command delay.
           spdlog::info("UDPDaemon: recv cmd too short: {}", diff.count());
@@ -311,23 +322,31 @@ namespace horizon::widowx
           // Sleep before reading to make sure command set is all done.
           // Smaller than 4ms sleep, conflicts arise and arm crashes.
           // NOTE: for agent high level control, dt_ is 100ms, so we can sleep for longer.
-          int sleep_time = dt_ - est_inf_comm_ms - 3 * max_motor_ms;
+          int sleep_time = dt_ - high_est_inf_comm_ms - 3 * max_motor_ms;
+          // Sleep at least max_motor_ms to avoid conflict with setting command.
           sleep_time = std::max(sleep_time, (int) max_motor_ms);
           std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
           bool has_enough_time_to_read = true;
           while (has_enough_time_to_read) {
+            auto currentTime = std::chrono::high_resolution_clock::now();
+            auto curr_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+              currentTime.time_since_epoch()).count();
             pusher->GetStatusAndSend(0);  // GetStatus blocks for about 3-4 ms
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> since_cmd_set = end - end_cmd;
-            // From end_cmd, within dt_ time, we need to read arm state, send over to client,
-            // then client needs to do inference and send command back, so we are good to read
-            // as long as since_cmd_set < dt_ - max_motor_ms - est_inf_comm_ms - est_comm_ms.
-            // NOTE: We add additional 2ms to the reading time to make readings more recent.
-            // But increasing it further increases the possibility of extra command delay.
-            // Tried 1.5ms with 50hz policy, adds 3ms reading delay.  Tried 3ms, increases cmd delay.
-            // 2ms seems to be a good balance.
-            has_enough_time_to_read =
-              since_cmd_set.count() * 1000 < dt_ - est_inf_comm_ms - max_motor_ms - est_comm_ms + 2;
+            currentTime = std::chrono::high_resolution_clock::now();
+            curr_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+              currentTime.time_since_epoch()).count();
+            long long since_last_read = curr_ms - last_read_ts;
+            // From time of last_read, within dt_ time, we need to read arm state, send over to client,
+            // so we are good to read, as long as since_last_read < dt_.
+            //
+            // When there is an offset, say 10ms wait before the server receives command from client,
+            // then we need to spend 10ms more on reading arm state, so that the next cycle is synced.
+            //
+            // NOTE: We add additional 4ms to the reading time to make readings potentially more recent.
+            // Increasing it further increases the possibility of extra command delay.
+            // Need to try 3ms with 50hz policy, adds ?ms reading delay.  Try 5ms, increases cmd delay.
+            // 4ms seems to be a good balance.
+            has_enough_time_to_read = since_last_read < dt_ + 4 + diff.count() * 1000;
           }
         }
         if (sync_mode_ && !pusher)
@@ -338,6 +357,9 @@ namespace horizon::widowx
         spdlog::info("Request LISTEN from {}:{}", listener_address, listener_port);
         pusher =
             std::make_unique<UDPPusher>(arm_low_.get(), listener_address, listener_port, sync_mode_);
+        // Initial state send (useful only for sync send)
+        if (sync_mode_)
+          pusher->GetStatusAndSend(0);
       } else {
         spdlog::error("Invalid command: {}", data);
       }
