@@ -34,8 +34,13 @@ namespace horizon::widowx
         if (result.size() == 7)
           break;
       }
-      if (last_read_ts)
-        *last_read_ts = std::stoll(start);
+      if (last_read_ts) {
+        while (start < text + len && *start != 'T') ++start;
+        if (start < text + len)
+          *last_read_ts = std::stoll(start + 2);
+        else
+          *last_read_ts = 0;
+      }
       return result;
     }
 
@@ -291,6 +296,8 @@ namespace horizon::widowx
       } else if (std::strncmp(data, CMD_SETPOS, 6) == 0) {
         long long last_read_ts = 0;
         std::vector<float> positions = ParseArray(data + 7, content_size - 7, &last_read_ts);
+        if (last_read_ts == 0)
+          spdlog::error("UDPDaemon: last_read_ts is 0!");
         // TODO(breakds): Check positions has 7 numbers.
         // This SetPosition is instantaneous.
         SetPosition(positions);
@@ -312,7 +319,7 @@ namespace horizon::widowx
         else if (diff.count() > 0.003)
           // This means we can spend this much more time on reading arm state after set command.
           spdlog::info("UDPDaemon: recv cmd took slightly long: {}", diff.count());
-        if (diff.count() < 3e-5)
+        if (diff.count() < 2e-5)
           // Recv cmd is too fast, cmd has already arrived when we are receiving.
           // There is probably extra command delay.
           spdlog::info("UDPDaemon: recv cmd too short: {}", diff.count());
