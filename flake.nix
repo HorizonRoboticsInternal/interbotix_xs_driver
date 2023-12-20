@@ -2,7 +2,7 @@
   description = "Provides low-level interfaces to easily control an Interbotix X-Series Robot";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/23.11";
     utils.url = "github:numtide/flake-utils";
   };
 
@@ -35,7 +35,7 @@
           gcc
           cmake
           cmakeCurses
-          pkgconfig
+          pkg-config
           
           yaml-cpp
           DynamixelSDK
