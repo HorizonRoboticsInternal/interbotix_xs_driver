@@ -4,9 +4,10 @@
 #include <filesystem>
 
 #include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
+#include "wx_armor/robot_profile.h"
 #include "yaml-cpp/yaml.h"
 
-namespace wx_armor {
+namespace horizon::wx_armor {
 
 class WxArmorDriver {
  public:
@@ -23,8 +24,7 @@ class WxArmorDriver {
   };
 
   WxArmorDriver(const std::string &usb_port,
-                std::filesystem::path motor_config_path,
-                std::filesystem::path mode_config_path);
+                std::filesystem::path motor_config_path);
 
  private:
   // ┌──────────────────┐
@@ -36,9 +36,7 @@ class WxArmorDriver {
   // ┌───────────────┐
   // │ Info (static) │
   // └───────────────┘
-
-  YAML::Node motor_configs_;
-  YAML::Node mode_configs_;
+  RobotProfile profile_;
   std::vector<MotorInfo> motor_states_;
 
   // ┌──────────────────┐
@@ -46,4 +44,4 @@ class WxArmorDriver {
   // └──────────────────┘
 };
 
-}  // namespace wx_armor
+}  // namespace horizon::wx_armor

@@ -61,6 +61,17 @@ target_link_libraries(protocols INTERFACE nlohmann_json::nlohmann_json)
 # | The Arm Server (WX Armor)              |
 # +----------------------------------------+
 
+add_library(robot_profile STATIC)
+target_sources(robot_profile
+    PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS wx_armor
+    FILES wx_armor/robot_profile.h
+    PRIVATE wx_armor/robot_profile.cc)
+target_link_libraries(robot_profile PUBLIC
+    spdlog::spdlog
+    yaml-cpp)
+
 add_library(wx_armor_driver STATIC)
 target_sources(wx_armor_driver
     PUBLIC
@@ -69,6 +80,7 @@ target_sources(wx_armor_driver
     FILES wx_armor/wx_armor_driver.h
     PRIVATE wx_armor/wx_armor_driver.cc)
 target_link_libraries(wx_armor_driver PUBLIC
+    robot_profile
     dynamixel_workbench_toolbox
     spdlog::spdlog
     yaml-cpp)
