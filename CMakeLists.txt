@@ -29,6 +29,7 @@ message(${PATH_TO_VERSION_OUTPUT_DIR})
 include_directories(${PATH_TO_VERSION_OUTPUT_DIR})
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(
   ${PROJECT_NAME} SHARED
@@ -55,6 +56,23 @@ find_package(nlohmann_json REQUIRED)
 add_library(protocols INTERFACE)
 target_sources(protocols INTERFACE src/protocols.h)
 target_link_libraries(protocols INTERFACE nlohmann_json::nlohmann_json)
+
+# +----------------------------------------+
+# | The Arm Server (WX Armor)              |
+# +----------------------------------------+
+
+add_library(wx_armor_driver STATIC)
+target_sources(wx_armor_driver
+    PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS wx_armor
+    FILES wx_armor/wx_armor_driver.h
+    PRIVATE wx_armor/wx_armor_driver.cc)
+target_link_libraries(wx_armor_driver PUBLIC spdlog::spdlog yaml-cpp)
+
+add_executable(wx_armor)
+target_sources(wx_armor PRIVATE wx_armor/wx_armor.cc)
+target_link_libraries(wx_armor PRIVATE wx_armor_driver)
 
 # +----------------------------------------+
 # | The UDP-based Server                   |
