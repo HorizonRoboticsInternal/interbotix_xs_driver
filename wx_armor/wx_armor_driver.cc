@@ -46,10 +46,16 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
       if (success.count(motor.id) > 0) continue;
       if (dxl_wb->ping(motor.id, &log)) {
         success.emplace(motor.id);
+        std::string model_name = dxl_wb->getModelName(motor.id);
         spdlog::info("Found DYNAMIXEL Motor ID: {}, Model: {}, Name: {}",
                      motor.id,
-                     dxl_wb->getModelName(motor.id),
+                     model_name,
                      motor.name);
+        if (model_name == "XL-320") {
+          spdlog::warn(
+              "Model XL-320's current reading is not supported by this "
+              "driver, because its effort is load (%) based.");
+        }
       } else {
         spdlog::error(
             "FAILED to ping Motor ID: {}, Name: {}", motor.id, motor.name);
@@ -69,6 +75,18 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
   return false;
 }
 
+auto LocateAddresses(DynamixelWorkbench *dxl_wb,
+                     const RobotProfile &profile,
+                     const std::string &key) -> ControlItem {
+  const ControlItem *address_info =
+      dxl_wb->getItemInfo(profile.motors.front().id, key.c_str());
+  spdlog::info("key: {}, address: {}, length: {}",
+               key,
+               address_info->address,
+               address_info->data_length);
+  return ControlItem{};
+}
+
 }  // namespace
 
 WxArmorDriver::WxArmorDriver(const std::string &usb_port,
@@ -81,6 +99,11 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   } else {
     spdlog::critical("Failed to connect to port {}", usb_port);
     std::abort();
+  }
+
+  if (dxl_wb_.getProtocolVersion() != 2.0) {
+    spdlog::critical("Requires protocol 2.0, but got {:.1f}",
+                     dxl_wb_.getProtocolVersion());
   }
 
   // For WindowX 250s, we are expecting
@@ -98,6 +121,10 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     spdlog::critical("Could not find all specified motors.");
     std::abort();
   }
+
+  LocateAddresses(&dxl_wb_, profile_, "Present_Position");
+  LocateAddresses(&dxl_wb_, profile_, "Present_Velocity");
+  LocateAddresses(&dxl_wb_, profile_, "Present_Current");
 
   // The EEPROM on the motors has a lifespan about 100,000 write
   // cycles. However, reading from eeprom does not affect it lifespan

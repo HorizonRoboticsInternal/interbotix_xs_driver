@@ -26,8 +26,28 @@ class WxArmorDriver {
   RobotProfile profile_;
   std::vector<MotorInfo> motor_states_;
 
+  struct OnboardReadAddress {
+    ControlItem position;
+    ControlItem velocity;
+    ControlItem current;
+  };
+
+  struct OnboardGoalAddress {
+    ControlItem position;
+
+    // TODO(breakds): Implement the following when other types of OpMode (i.e.
+    // other than Position Control) are needed.
+
+    // ControlItem velocity;
+    // ControlItem current;
+    // ControlItem pwm;
+  };
+
+  OnboardReadAddress reading_;
+  OnboardGoalAddress writing_;
+
   // ┌──────────────────┐
-  // │ States (mutable) │
+  // │ Mutables         │
   // └──────────────────┘
 };
 
