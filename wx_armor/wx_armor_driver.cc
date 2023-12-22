@@ -15,7 +15,13 @@ static constexpr uint32_t DEFAULT_BAUDRATE = 1'000'000;
 // crash the program.
 auto LoadConfigOrDie(fs::path config_path) -> YAML::Node {
   try {
-    return YAML::LoadFile(config_path.c_str());
+    YAML::Node node = YAML::LoadFile(config_path.c_str());
+    if (node.IsNull()) {
+      spdlog::critical("Failed to read config file {} as it is empty.",
+                       config_path.string());
+      std::abort();
+    }
+    return node;
   } catch (YAML::BadFile &error) {
     spdlog::critical("Failed to load the config file {}, due to {}",
                      config_path.string(),
