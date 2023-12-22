@@ -1,8 +1,10 @@
 #pragma once
 
 #include <chrono>
+#include <cstdlib>
 #include <vector>
 
+#include "spdlog/spdlog.h"
 #include "yaml-cpp/yaml.h"
 
 namespace horizon::wx_armor {
@@ -60,10 +62,24 @@ class EEPROMRegisterTable {
 struct RobotProfile {
   std::vector<MotorInfo> motors{};
   EEPROMRegisterTable eeprom{};
+  // The concept of "Joints" is a subset of all motors. It is a subset
+  // because some of the joints can have more than one motors (called
+  // "shadow" motors) coverting them.
+  std::vector<uint8_t> joint_ids{};
+  std::vector<std::string> joint_names{};
 
   RobotProfile() = default;
   RobotProfile(RobotProfile &&) = default;
   RobotProfile &operator=(RobotProfile &) = default;
+
+  inline const MotorInfo *motor(const std::string name) const {
+    for (const MotorInfo &entry : motors) {
+      if (entry.name == name) {
+        return &entry;
+      }
+    }
+    return nullptr;
+  }
 };
 
 }  // namespace horizon::wx_armor
@@ -74,6 +90,7 @@ template <>
 struct convert<horizon::wx_armor::RobotProfile> {
   static bool decode(const Node &node,
                      horizon::wx_armor::RobotProfile &profile) {
+    // Fill in model information.
     for (const auto &child : node["motors"]) {
       YAML::Node info = child.second;
       uint8_t motor_id = info["ID"].as<uint8_t>();
@@ -94,6 +111,21 @@ struct convert<horizon::wx_armor::RobotProfile> {
         profile.eeprom.Add(motor_id, key, kv.second.as<int32_t>());
       }
     }
+
+    // Fill in joint IDs.
+    for (const auto &child : node["joint_order"]) {
+      std::string name = child.as<std::string>();
+      const horizon::wx_armor::MotorInfo *motor = profile.motor(name);
+      if (motor == nullptr) {
+        spdlog::critical(
+            "Malformed motor config. Cannot find a motor named '{}', which "
+            "appears in 'joint_order'",
+            name);
+      }
+      profile.joint_ids.emplace_back(motor->id);
+      profile.joint_names.emplace_back(motor->name);
+    }
+
     return true;
   }
 };
