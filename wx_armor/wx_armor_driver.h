@@ -1,19 +1,49 @@
 #pragma once
 
-#include "yaml-cpp/yaml.h"
-
+#include <chrono>
 #include <filesystem>
+
+#include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
+#include "yaml-cpp/yaml.h"
 
 namespace wx_armor {
 
 class WxArmorDriver {
  public:
-  WxArmorDriver(std::filesystem::path motor_config_path,
+  struct MotorInfo {
+    // Dynamixel ID of the motor
+    uint8_t id;
+
+    // The operating mode of the motor.
+    std::string mode;
+
+    std::string profile_type;
+    std::chrono::milliseconds profile_vel;
+    std::chrono::milliseconds profile_acc;
+  };
+
+  WxArmorDriver(const std::string &usb_port,
+                std::filesystem::path motor_config_path,
                 std::filesystem::path mode_config_path);
 
  private:
+  // ┌──────────────────┐
+  // │ The motor handle │
+  // └──────────────────┘
+
+  DynamixelWorkbench dxl_wb_;
+
+  // ┌───────────────┐
+  // │ Info (static) │
+  // └───────────────┘
+
   YAML::Node motor_configs_;
   YAML::Node mode_configs_;
+  std::vector<MotorInfo> motor_states_;
+
+  // ┌──────────────────┐
+  // │ States (mutable) │
+  // └──────────────────┘
 };
 
 }  // namespace wx_armor

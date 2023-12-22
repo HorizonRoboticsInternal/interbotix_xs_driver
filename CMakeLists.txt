@@ -68,7 +68,10 @@ target_sources(wx_armor_driver
     BASE_DIRS wx_armor
     FILES wx_armor/wx_armor_driver.h
     PRIVATE wx_armor/wx_armor_driver.cc)
-target_link_libraries(wx_armor_driver PUBLIC spdlog::spdlog yaml-cpp)
+target_link_libraries(wx_armor_driver PUBLIC
+    dynamixel_workbench_toolbox
+    spdlog::spdlog
+    yaml-cpp)
 
 add_executable(wx_armor)
 target_sources(wx_armor PRIVATE wx_armor/wx_armor.cc)

@@ -8,7 +8,8 @@ using wx_armor::WxArmorDriver;
 int main(int argc, char** argv) {
   std::filesystem::path configs_path = std::filesystem::path(
       "/home/breakds/projects/interbotix_xs_driver/configs/");
-  WxArmorDriver driver(configs_path / "wx250s_motor_config.yaml",
+  WxArmorDriver driver("/dev/ttyDXL",
+                       configs_path / "wx250s_motor_config.yaml",
                        configs_path / "mode_configs.yaml");
 
   return 0;
