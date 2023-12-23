@@ -15,11 +15,12 @@ DynamixelIO::DynamixelIO(IOType type,
     : dxl_wb_(dxl_wb),
       joint_ids_(joint_ids),
       num_joints_(static_cast<uint8_t>(joint_ids.size())) {
-  uint16_t start_address = std::numeric_limits<uint16_t>();
+  uint16_t start_address = std::numeric_limits<uint16_t>::max();
   uint16_t length = 0;
 
   for (const std::string &key : keys) {
-    const ControlItem *info = dxl_wb->getItemInfo(joint_ids.front(), key);
+    const ControlItem *info =
+        dxl_wb->getItemInfo(joint_ids.front(), key.c_str());
 
     if (info == nullptr) {
       spdlog::critical("Cannot find onboard item '{}' for DynamixelIO.", key);
@@ -28,8 +29,10 @@ DynamixelIO::DynamixelIO(IOType type,
 
     // Merge the new address info into the current range represented
     // by (start_address, length).
-    start_address = std::min(start_address, info.address);
-    length = std::max(length, info.address_ + info.data_length - start_address);
+    length = std::max(length,
+                      static_cast<uint16_t>(info->address + info->data_length -
+                                            start_address));
+    start_address = std::min(start_address, info->address);
     address_per_key_[key] = *info;
   }
 
@@ -38,27 +41,30 @@ DynamixelIO::DynamixelIO(IOType type,
     if (!dxl_wb->addSyncReadHandler(start_address, length)) {
       spdlog::critical("Failed to add sync read handler.");
       std::abort();
+    } else {
+      spdlog::info(
+          "Registered read (address = {}, length = {})", start_address, length);
     }
   }
 }
 
 JointStateReader::JointStateReader(DynamixelWorkbench *dxl_wb,
                                    const std::vector<uint8_t> &joint_ids)
-    : DynamixelIO(dxl_wb,
+    : DynamixelIO(IOType::READ,
+                  dxl_wb,
                   joint_ids,
-                  {"Present_Position", "Prsent_Velocity", "Present_Current"}),
+                  {"Present_Position", "Present_Velocity", "Present_Current"}),
       position_int_(joint_ids.size()),
       velocity_int_(joint_ids.size()),
-      current_int_(joint_ids.size()),
-{
+      current_int_(joint_ids.size()) {
   position_add_ = GetAddress("Present_Position");
   velocity_add_ = GetAddress("Present_Velocity");
   current_add_ = GetAddress("Present_Current");
 }
 
-bool JointStateReader::Read(std::vector<float> *position,
-                            std::vector<float> *velocity,
-                            std::vector<float> *current) {
+bool JointStateReader::ReadTo(std::vector<float> *position,
+                              std::vector<float> *velocity,
+                              std::vector<float> *current) {
   std::unique_lock<std::mutex> handler_lock{handler_mutex_};
   const char *log;
   if (!dxl_wb_->syncRead(
@@ -107,9 +113,11 @@ bool JointStateReader::Read(std::vector<float> *position,
   handler_lock.unlock();
 
   for (size_t i = 0; i < position_int_.size(); ++i) {
-    position[i] = dxl_wb_->convertvalue2Radian(position_int_[i]);
-    velocity[i] = dxl_wb_->convertvalue2Velocity(velocity_int_[i]);
-    current[i] = dxl_wb_->convertvalue2Current(current_int_[i]);
+    (*position)[i] =
+        dxl_wb_->convertValue2Radian(joint_ids_[i], position_int_[i]);
+    (*velocity)[i] =
+        dxl_wb_->convertValue2Velocity(joint_ids_[i], velocity_int_[i]);
+    (*current)[i] = dxl_wb_->convertValue2Current(current_int_[i]);
   }
 
   return true;

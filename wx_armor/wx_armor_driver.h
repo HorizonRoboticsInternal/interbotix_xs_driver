@@ -1,8 +1,10 @@
 #pragma once
 
 #include <filesystem>
+#include <memory>
 
 #include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
+#include "wx_armor/io.h"
 #include "wx_armor/robot_profile.h"
 #include "yaml-cpp/yaml.h"
 
@@ -26,29 +28,14 @@ class WxArmorDriver {
   RobotProfile profile_;
   std::vector<MotorInfo> motor_states_;
 
-  struct OnboardReadAddress {
-    ControlItem position;
-    ControlItem velocity;
-    ControlItem current;
-  };
-
-  struct OnboardGoalAddress {
-    ControlItem position;
-
-    // TODO(breakds): Implement the following when other types of OpMode (i.e.
-    // other than Position Control) are needed.
-
-    // ControlItem velocity;
-    // ControlItem current;
-    // ControlItem pwm;
-  };
-
-  OnboardReadAddress reading_;
-  OnboardGoalAddress writing_;
-
   // ┌──────────────────┐
   // │ Mutables         │
   // └──────────────────┘
+
+  std::unique_ptr<JointStateReader> reader_ = nullptr;
+  std::vector<float> position_;
+  std::vector<float> velocity_;
+  std::vector<float> current_;
 };
 
 }  // namespace horizon::wx_armor

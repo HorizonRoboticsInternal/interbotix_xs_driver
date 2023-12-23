@@ -75,23 +75,14 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
   return false;
 }
 
-auto LocateAddresses(DynamixelWorkbench *dxl_wb,
-                     const RobotProfile &profile,
-                     const std::string &key) -> ControlItem {
-  const ControlItem *address_info =
-      dxl_wb->getItemInfo(profile.motors.front().id, key.c_str());
-  spdlog::info("key: {}, address: {}, length: {}",
-               key,
-               address_info->address,
-               address_info->data_length);
-  return ControlItem{};
-}
-
 }  // namespace
 
 WxArmorDriver::WxArmorDriver(const std::string &usb_port,
                              fs::path motor_config_path)
-    : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()) {
+    : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()),
+      position_(profile_.joint_ids.size()),
+      velocity_(profile_.joint_ids.size()),
+      current_(profile_.joint_ids.size()) {
   // Now, initialize the handle, connecting to the specified usb port. It
   // returns false if the initialization fails.
   if (dxl_wb_.init(usb_port.c_str(), DEFAULT_BAUDRATE)) {
@@ -122,9 +113,20 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     std::abort();
   }
 
-  LocateAddresses(&dxl_wb_, profile_, "Present_Position");
-  LocateAddresses(&dxl_wb_, profile_, "Present_Velocity");
-  LocateAddresses(&dxl_wb_, profile_, "Present_Current");
+  reader_ = std::make_unique<JointStateReader>(&dxl_wb_, profile_.joint_ids);
+
+  for (int i = 0; i < 10; ++i) {
+    spdlog::info("Start Read.");
+    reader_->ReadTo(&position_, &velocity_, &current_);
+    spdlog::info("Positions: {}, {}, {}, {}, {}, {}, {}",
+                 position_[0],
+                 position_[1],
+                 position_[2],
+                 position_[3],
+                 position_[4],
+                 position_[5],
+                 position_[6]);
+  }
 
   // The EEPROM on the motors has a lifespan about 100,000 write
   // cycles. However, reading from eeprom does not affect it lifespan

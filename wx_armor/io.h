@@ -25,7 +25,7 @@ class DynamixelIO {
     return address_per_key_.at(key);
   }
 
- private:
+ protected:
   DynamixelWorkbench *dxl_wb_;
   std::vector<uint8_t> joint_ids_;
   uint8_t num_joints_;
@@ -34,18 +34,18 @@ class DynamixelIO {
   std::map<std::string, ControlItem> address_per_key_{};
 };
 
-class JointStateReader : public DynamixelIO {
+class JointStateReader : protected DynamixelIO {
  public:
   JointStateReader(DynamixelWorkbench *dxl_wb,
                    const std::vector<uint8_t> &joint_ids);
 
-  bool Read(std::vector<float> *position,
-            std::vector<float> *velocity,
-            std::vector<float> *current);
+  bool ReadTo(std::vector<float> *position,
+              std::vector<float> *velocity,
+              std::vector<float> *current);
 
  private:
-  std::mutex_ handler_mutex_;
-  std::mutex_ int_buffer_mutex_;
+  std::mutex handler_mutex_;
+  std::mutex int_buffer_mutex_;
   ControlItem position_add_;
   std::vector<int32_t> position_int_;
   ControlItem velocity_add_;

@@ -72,6 +72,17 @@ target_link_libraries(robot_profile PUBLIC
     spdlog::spdlog
     yaml-cpp)
 
+add_library(io STATIC)
+target_sources(io
+    PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS wx_armor
+    FILES wx_armor/io.h
+    PRIVATE wx_armor/io.cc)
+target_link_libraries(io PUBLIC
+    dynamixel_workbench_toolbox
+    spdlog::spdlog)
+
 add_library(wx_armor_driver STATIC)
 target_sources(wx_armor_driver
     PUBLIC
@@ -80,6 +91,7 @@ target_sources(wx_armor_driver
     FILES wx_armor/wx_armor_driver.h
     PRIVATE wx_armor/wx_armor_driver.cc)
 target_link_libraries(wx_armor_driver PUBLIC
+    io
     robot_profile
     dynamixel_workbench_toolbox
     spdlog::spdlog
