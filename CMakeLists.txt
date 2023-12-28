@@ -101,6 +101,12 @@ add_executable(wx_armor)
 target_sources(wx_armor PRIVATE wx_armor/wx_armor.cc)
 target_link_libraries(wx_armor PRIVATE wx_armor_driver)
 
+add_executable(perf)
+target_sources(perf PRIVATE wx_armor/perf.cc)
+target_link_libraries(perf PRIVATE spdlog::spdlog
+    dynamixel_workbench_toolbox
+    dynamixel_sdk)
+
 # +----------------------------------------+
 # | The UDP-based Server                   |
 # +----------------------------------------+
