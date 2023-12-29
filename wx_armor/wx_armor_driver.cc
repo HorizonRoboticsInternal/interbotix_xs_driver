@@ -214,6 +214,25 @@ void WxArmorDriver::FetchSensorData() {
   }
 }
 
+void WxArmorDriver::SetPosition(const std::vector<double> &position) {
+  std::vector<int32_t> int_command(profile_.joint_ids.size(), 0);
+  for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+    int_command[i] = dxl_wb_.convertRadian2Value(
+        profile_.joint_ids[i], static_cast<float>(position.at(i)));
+  }
+
+  const char *log = nullptr;
+  const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
+  if (!dxl_wb_.syncWrite(write_position_handler_index_,
+                         profile_.joint_ids.data(),
+                         num_joints,
+                         int_command.data(),
+                         1, /* TODO(breakds) what is it? */
+                         &log)) {
+    spdlog::error("Cannot write position command: {}", log);
+  }
+}
+
 ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {
   // Here we assume that the data allocation on all of the motors are identical.
   // Therefore, we can just read the address of the motor ID and call it a day.

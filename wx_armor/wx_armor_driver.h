@@ -32,6 +32,8 @@ class WxArmorDriver {
   // Blocking. Each call to this should take around 2ms.
   void FetchSensorData();
 
+  void SetPosition(const std::vector<double> &position);
+
  private:
   ControlItem AddItemToRead(const std::string &name);
 
@@ -85,7 +87,8 @@ class WxArmorDriver {
   // Therefore we will need to store handler index for each of them.
   uint8_t write_position_handler_index_;
 
-  // Similar to how we read, we also write to identical addresses on each motor.
+  // Similar to how we read, we also write to identical addresses on each
+  // motor.
   ControlItem write_position_address_;
 };
 
