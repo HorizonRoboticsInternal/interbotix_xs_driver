@@ -32,6 +32,8 @@ class WxArmorDriver {
   // │ Mutables         │
   // └──────────────────┘
 
+  // Note that each call to `JointStateReader::ReadTo` takes around 12ms to
+  // finish, under the default baud rate 1000000.
   std::unique_ptr<JointStateReader> reader_ = nullptr;
   std::vector<float> position_;
   std::vector<float> velocity_;

@@ -97,7 +97,7 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
                      dxl_wb_.getProtocolVersion());
   }
 
-  // For WindowX 250s, we are expecting
+  // For WindowX 250s, we are expecting 9 motors
   //
   // Found DYNAMIXEL Motor ID: 1, Model: XM430-W350, Name: waist
   // Found DYNAMIXEL Motor ID: 2, Model: XM430-W350, Name: shoulder
