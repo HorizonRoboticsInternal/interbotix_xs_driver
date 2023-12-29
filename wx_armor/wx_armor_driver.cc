@@ -79,10 +79,7 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
 
 WxArmorDriver::WxArmorDriver(const std::string &usb_port,
                              fs::path motor_config_path)
-    : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()),
-      position_(profile_.joint_ids.size()),
-      velocity_(profile_.joint_ids.size()),
-      current_(profile_.joint_ids.size()) {
+    : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()) {
   // Now, initialize the handle, connecting to the specified usb port. It
   // returns false if the initialization fails.
   if (dxl_wb_.init(usb_port.c_str(), DEFAULT_BAUDRATE)) {
@@ -113,19 +110,19 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     std::abort();
   }
 
-  reader_ = std::make_unique<JointStateReader>(&dxl_wb_, profile_.joint_ids);
+  InitReadHandler();
 
   for (int i = 0; i < 10; ++i) {
     spdlog::info("Start Read.");
-    reader_->ReadTo(&position_, &velocity_, &current_);
+    FetchSensorData();
     spdlog::info("Positions: {}, {}, {}, {}, {}, {}, {}",
-                 position_[0],
-                 position_[1],
-                 position_[2],
-                 position_[3],
-                 position_[4],
-                 position_[5],
-                 position_[6]);
+                 latest_reading_.pos[0],
+                 latest_reading_.pos[1],
+                 latest_reading_.pos[2],
+                 latest_reading_.pos[3],
+                 latest_reading_.pos[4],
+                 latest_reading_.pos[5],
+                 latest_reading_.pos[6]);
   }
 
   // The EEPROM on the motors has a lifespan about 100,000 write
@@ -133,6 +130,126 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   //
   // TODO(breakds): We should only write to it if we find discrepancies, i.e.
   // write-on-change.
+}
+
+// TODO(breakds): Support fetching position only, and see whether it will be
+// faster.
+void WxArmorDriver::FetchSensorData() {
+  std::vector<int32_t> buffer(profile_.joint_ids.size());
+  const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
+
+  std::unique_lock<std::mutex> handler_lock{read_handler_mutex_};
+  const char *log;
+
+  // Note that each call to `syncRead` takes around 12ms to finish for all 7
+  // joints of WidowX 250s , under the default baud rate 1000000. The bottleneck
+  // is actually on the U2D2 board. It takes U2D2 nearly 2ms to transmit the
+  // data for each of the 7 joints of WidowX 250s.
+  if (!dxl_wb_.syncRead(
+          read_handler_index_, profile_.joint_ids.data(), num_joints, &log)) {
+    spdlog::critical("Failed to syncRead: {}", log);
+    std::abort();
+  }
+
+  // No body can hold latest_reading_lock forever, meaning there is no risk of
+  // dead lock here.
+  std::lock_guard<std::mutex> latest_reading_lock{latest_reading_mutex_};
+
+  // 1. Extract Position
+
+  if (!dxl_wb_.getSyncReadData(read_handler_index_,
+                               profile_.joint_ids.data(),
+                               num_joints,
+                               read_position_address_.address,
+                               read_position_address_.data_length,
+                               buffer.data(),
+                               &log)) {
+    spdlog::critical("Cannot getSyncReadData (position): {}", log);
+    std::abort();
+  }
+
+  for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+    // TODO(breakds): Roll out our own version using double.
+    latest_reading_.pos[i] = static_cast<double>(
+        dxl_wb_.convertValue2Radian(profile_.joint_ids[i], buffer[i]));
+  }
+
+  // 2. Extract Velocity
+
+  if (!dxl_wb_.getSyncReadData(read_handler_index_,
+                               profile_.joint_ids.data(),
+                               num_joints,
+                               read_velocity_address_.address,
+                               read_velocity_address_.data_length,
+                               buffer.data(),
+                               &log)) {
+    spdlog::critical("Cannot getSyncReadData (velocity): {}", log);
+    std::abort();
+  }
+
+  for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+    // TODO(breakds): Roll out our own version using double.
+    latest_reading_.vel[i] = static_cast<double>(
+        dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], buffer[i]));
+  }
+
+  // 3. Extract Current
+
+  if (!dxl_wb_.getSyncReadData(read_handler_index_,
+                               profile_.joint_ids.data(),
+                               num_joints,
+                               read_current_address_.address,
+                               read_current_address_.data_length,
+                               buffer.data(),
+                               &log)) {
+    spdlog::critical("Cannot getSyncReadData (current): {}", log);
+    std::abort();
+  }
+
+  for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+    // TODO(breakds): Roll out our own version using double.
+    latest_reading_.crt[i] = static_cast<double>(
+        dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]));
+  }
+}
+
+ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {
+  // Here we assume that the data allocation on all of the motors are identical.
+  // Therefore, we can just read the address of the motor ID and call it a day.
+  const ControlItem *address =
+      dxl_wb_.getItemInfo(profile_.joint_ids.front(), name.c_str());
+
+  if (address == nullptr) {
+    spdlog::critical("Cannot find onboard item '{}' to read.", name);
+    std::abort();
+  }
+
+  read_start_ = std::min(read_start_, address->address);
+  read_end_ =
+      std::max(read_end_,
+               static_cast<uint16_t>(address->address + address->data_length));
+
+  return *address;
+}
+
+void WxArmorDriver::InitReadHandler() {
+  read_position_address_ = AddItemToRead("Present_Position");
+  read_velocity_address_ = AddItemToRead("Present_Velocity");
+  read_current_address_ = AddItemToRead("Present_Current");
+
+  read_handler_index_ = dxl_wb_.getTheNumberOfSyncReadHandler();
+  if (!dxl_wb_.addSyncReadHandler(read_start_, read_end_ - read_start_)) {
+    spdlog::critical("Failed to add sync read handler.");
+    std::abort();
+  } else {
+    spdlog::info("Registered sync read handler (address = {}, length = {})",
+                 read_start_,
+                 read_end_ - read_start_);
+  }
+
+  latest_reading_.pos.resize(profile_.joint_ids.size(), 0.0);
+  latest_reading_.vel.resize(profile_.joint_ids.size(), 0.0);
+  latest_reading_.crt.resize(profile_.joint_ids.size(), 0.0);
 }
 
 }  // namespace horizon::wx_armor
