@@ -13,6 +13,9 @@
     };
     overlays.default = nixpkgs.lib.composeManyExtensions [
       self.overlays.dev
+      (final: prev: {
+        wx_armor = final.callPackage ./wx_armor {};
+      })
     ];
   } // utils.lib.eachSystem [
     "x86_64-linux" "aarch64-linux"
@@ -52,7 +55,7 @@
       };
 
       packages = {
-        inherit (pkgs) DynamixelSDK dynamixel-workbench;
+        inherit (pkgs) DynamixelSDK dynamixel-workbench wx_armor;
       };
     });
 }
