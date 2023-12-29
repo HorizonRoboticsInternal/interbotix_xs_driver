@@ -222,6 +222,11 @@ ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {
   if (address == nullptr) {
     spdlog::critical("Cannot find onboard item '{}' to read.", name);
     std::abort();
+  } else {
+    spdlog::info("Register '{}' reader at (address = {}, length = {})",
+                 name,
+                 address->address,
+                 address->data_length);
   }
 
   read_start_ = std::min(read_start_, address->address);
