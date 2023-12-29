@@ -111,6 +111,7 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   }
 
   InitReadHandler();
+  InitWriteHandler();
 
   for (int i = 0; i < 10; ++i) {
     spdlog::info("Start Read.");
@@ -255,6 +256,38 @@ void WxArmorDriver::InitReadHandler() {
   latest_reading_.pos.resize(profile_.joint_ids.size(), 0.0);
   latest_reading_.vel.resize(profile_.joint_ids.size(), 0.0);
   latest_reading_.crt.resize(profile_.joint_ids.size(), 0.0);
+}
+
+void WxArmorDriver::InitWriteHandler() {
+  static constexpr char GOAL_POSITION[] = "Goal_Position";
+
+  // TODO(breakds): Initialize write handler for other operation mode as well.
+  if (profile_.motors.front().op_mode != OpMode::POSITION) {
+    spdlog::critical("WxArmorDriver not implemented for OpMode != POSITON.");
+    std::abort();
+  }
+
+  const ControlItem *address =
+      dxl_wb_.getItemInfo(profile_.joint_ids.front(), GOAL_POSITION);
+  if (address == nullptr) {
+    spdlog::critical("Cannot find onboard item '{}' to write.", GOAL_POSITION);
+    std::abort();
+  }
+
+  write_position_address_ = *address;
+
+  write_position_handler_index_ = dxl_wb_.getTheNumberOfSyncWriteHandler();
+  if (!dxl_wb_.addSyncWriteHandler(write_position_address_.address,
+                                   write_position_address_.data_length)) {
+    spdlog::critical("Failed to add sync write handler for {}", GOAL_POSITION);
+    std::abort();
+  } else {
+    spdlog::info(
+        "Registered sync write handler for {} (address = {}, length = {})",
+        GOAL_POSITION,
+        write_position_address_.address,
+        write_position_address_.data_length);
+  }
 }
 
 }  // namespace horizon::wx_armor

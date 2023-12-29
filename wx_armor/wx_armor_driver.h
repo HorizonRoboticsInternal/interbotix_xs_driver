@@ -29,11 +29,15 @@ class WxArmorDriver {
   WxArmorDriver(const std::string &usb_port,
                 std::filesystem::path motor_config_path);
 
+  // Blocking. Each call to this should take around 2ms.
   void FetchSensorData();
 
  private:
   ControlItem AddItemToRead(const std::string &name);
+
   void InitReadHandler();
+
+  void InitWriteHandler();
 
   // ┌──────────────────┐
   // │ The motor handle │
@@ -50,8 +54,6 @@ class WxArmorDriver {
   // │ Read             │
   // └──────────────────┘
 
-  // Note that each call to `JointStateReader::ReadTo` takes around 12ms to
-  // finish, under the default baud rate 1000000.
   std::mutex read_handler_mutex_;
   uint8_t read_handler_index_ = 0;
 
@@ -71,6 +73,20 @@ class WxArmorDriver {
   // to the motors to read such data resides within the address interval.
   uint16_t read_start_ = std::numeric_limits<uint16_t>::max();
   uint16_t read_end_ = 0;
+
+  // ┌──────────────────┐
+  // │ Write            │
+  // └──────────────────┘
+
+  std::mutex write_handler_mutex_;
+
+  // Unlike write, in the future we may have write handler for each of the
+  // operation mode (e.g. position control, velocity control, pwm control).
+  // Therefore we will need to store handler index for each of them.
+  uint8_t write_position_handler_index_;
+
+  // Similar to how we read, we also write to identical addresses on each motor.
+  ControlItem write_position_address_;
 };
 
 }  // namespace horizon::wx_armor
