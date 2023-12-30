@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
+#include "nlohmann/json.hpp"
 #include "wx_armor/robot_profile.h"
 #include "yaml-cpp/yaml.h"
 
@@ -22,6 +23,8 @@ struct SensorData {
   // The timestamp at which the sensor data is requested, which is approximately
   // when the measurement is taken.
   int64_t timestamp = 0;
+
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(SensorData, pos, vel, crt, timestamp);
 };
 
 class WxArmorDriver {

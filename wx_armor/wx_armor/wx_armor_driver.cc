@@ -142,10 +142,6 @@ void WxArmorDriver::FetchSensorData() {
   std::unique_lock<std::mutex> handler_lock{read_handler_mutex_};
   const char *log;
 
-  // Note that each call to `syncRead` takes around 12ms to finish for all 7
-  // joints of WidowX 250s , under the default baud rate 1000000. The bottleneck
-  // is actually on the U2D2 board. It takes U2D2 nearly 2ms to transmit the
-  // data for each of the 7 joints of WidowX 250s.
   if (!dxl_wb_.syncRead(
           read_handler_index_, profile_.joint_ids.data(), num_joints, &log)) {
     spdlog::critical("Failed to syncRead: {}", log);
@@ -155,6 +151,14 @@ void WxArmorDriver::FetchSensorData() {
   // No body can hold latest_reading_lock forever, meaning there is no risk of
   // dead lock here.
   std::lock_guard<std::mutex> latest_reading_lock{latest_reading_mutex_};
+
+  // We use the time here as the timestamp for the latest reading. This is,
+  // however, an approximation. It won't be much off because the syncRead above
+  // typically takes 2ms to complete.
+  latest_reading_.timestamp =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count();
 
   // 1. Extract Position
 

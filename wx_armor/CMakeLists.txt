@@ -24,6 +24,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(yaml-cpp REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(Drogon REQUIRED)
 
 # ┌─────────────────┐
@@ -52,6 +53,7 @@ target_link_libraries(wx_armor_driver PUBLIC
     robot_profile
     dynamixel_workbench_toolbox
     spdlog::spdlog
+    nlohmann_json::nlohmann_json
     yaml-cpp)
 
 add_library(wx_armor_ws STATIC)
