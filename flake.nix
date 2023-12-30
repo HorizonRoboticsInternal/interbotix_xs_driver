@@ -45,8 +45,8 @@
           dynamixel-workbench
           spdlog
           boost
-          websocketpp
           nlohmann_json
+          drogon
         ];
 
         shellHook = ''

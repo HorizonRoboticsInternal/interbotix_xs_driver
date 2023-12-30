@@ -24,7 +24,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(yaml-cpp REQUIRED)
 find_package(spdlog REQUIRED)
-# find_package(dynamixel_workbench_toolbox)
+find_package(Drogon REQUIRED)
 
 # ┌─────────────────┐
 # │ Targets         │
@@ -54,9 +54,20 @@ target_link_libraries(wx_armor_driver PUBLIC
     spdlog::spdlog
     yaml-cpp)
 
+add_library(wx_armor_ws STATIC)
+target_sources(wx_armor_ws
+    PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS wx_armor
+    FILES wx_armor/wx_armor_ws.h
+    PRIVATE wx_armor/wx_armor_ws.cc)
+target_link_libraries(wx_armor_ws PUBLIC
+    Drogon::Drogon
+    spdlog::spdlog)
+
 add_executable(wx_armor)
 target_sources(wx_armor PRIVATE wx_armor/wx_armor.cc)
-target_link_libraries(wx_armor PRIVATE wx_armor_driver)
+target_link_libraries(wx_armor PRIVATE wx_armor_driver wx_armor_ws)
 
 # ┌─────────────────┐
 # │ Install         │
