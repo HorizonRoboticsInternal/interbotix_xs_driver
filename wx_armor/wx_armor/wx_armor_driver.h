@@ -4,6 +4,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
 #include "nlohmann/json.hpp"
@@ -36,6 +37,8 @@ class WxArmorDriver {
   void FetchSensorData();
 
   void SetPosition(const std::vector<double> &position);
+
+  void StartLoop();
 
  private:
   ControlItem AddItemToRead(const std::string &name);
@@ -78,6 +81,8 @@ class WxArmorDriver {
   // to the motors to read such data resides within the address interval.
   uint16_t read_start_ = std::numeric_limits<uint16_t>::max();
   uint16_t read_end_ = 0;
+
+  std::jthread read_loop_thread_{};
 
   // ┌──────────────────┐
   // │ Write            │

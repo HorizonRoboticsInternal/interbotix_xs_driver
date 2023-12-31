@@ -237,6 +237,15 @@ void WxArmorDriver::SetPosition(const std::vector<double> &position) {
   }
 }
 
+void WxArmorDriver::StartLoop() {
+  read_loop_thread_ = std::jthread([this]() {
+    while (true) {
+      FetchSensorData();
+      std::this_thread::sleep_for(std::chrono::microseconds(1));
+    }
+  });
+}
+
 ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {
   // Here we assume that the data allocation on all of the motors are identical.
   // Therefore, we can just read the address of the motor ID and call it a day.

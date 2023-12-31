@@ -65,11 +65,12 @@ target_sources(wx_armor_ws
     PRIVATE wx_armor/wx_armor_ws.cc)
 target_link_libraries(wx_armor_ws PUBLIC
     Drogon::Drogon
-    spdlog::spdlog)
+    spdlog::spdlog
+    wx_armor_driver)
 
 add_executable(wx_armor)
 target_sources(wx_armor PRIVATE wx_armor/wx_armor.cc)
-target_link_libraries(wx_armor PRIVATE wx_armor_driver wx_armor_ws)
+target_link_libraries(wx_armor PRIVATE wx_armor_ws)
 
 # ┌─────────────────┐
 # │ Install         │
@@ -86,7 +87,7 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 
 install(
-    TARGETS robot_profile wx_armor_driver wx_armor
+    TARGETS robot_profile wx_armor_driver wx_armor_ws wx_armor
     EXPORT ${PROJECT_NAME}_Targets
     FILE_SET HEADERS)
 
