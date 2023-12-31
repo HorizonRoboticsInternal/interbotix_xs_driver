@@ -33,7 +33,11 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
                                             std::string &&message,
                                             const WebSocketMessageType &type) {
   if (type == WebSocketMessageType::Text) {
-    spdlog::info("Received! Message = {}", message);
+    if (std::strncmp(message.data(), CMD_READ, 4) == 0) {
+      spdlog::info("READ");
+    } else if (std::strncmp(message.data(), CMD_SETPOS, 6) == 0) {
+      spdlog::info("SETPOS");
+    }
   }
 }
 
@@ -44,7 +48,8 @@ void WxArmorWebController::handleConnectionClosed(
 
 void WxArmorWebController::handleNewConnection(
     const HttpRequestPtr &req, const WebSocketConnectionPtr &conn) {
-  spdlog::info("Connected!");
+  conn->setContext(std::make_shared<ClientState>());
+  spdlog::info("Connected");
   conn->send("ok");
 }
 

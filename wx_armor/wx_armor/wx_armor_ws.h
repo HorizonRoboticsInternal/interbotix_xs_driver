@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
@@ -15,6 +16,11 @@ namespace horizon::wx_armor {
 WxArmorDriver *Driver();
 
 void StartDriverLoop();
+
+struct ClientState {
+  bool engaging = false;
+  std::chrono::time_point<std::chrono::system_clock> latest_healthy_time{};
+};
 
 class WxArmorWebController
     : public drogon::WebSocketController<WxArmorWebController> {
@@ -33,6 +39,10 @@ class WxArmorWebController
   WS_PATH_LIST_BEGIN
   WS_PATH_ADD("/api/engage", drogon::Get);
   WS_PATH_LIST_END
+
+ private:
+  static constexpr char CMD_SETPOS[] = "SETPOS";
+  static constexpr char CMD_READ[] = "READ";
 };
 
 template <typename T>
