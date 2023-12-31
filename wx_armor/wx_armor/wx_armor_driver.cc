@@ -218,6 +218,11 @@ void WxArmorDriver::FetchSensorData() {
   }
 }
 
+nlohmann::json WxArmorDriver::SensorDataToJson() const {
+  std::lock_guard<std::mutex> lock(latest_reading_mutex_);
+  return nlohmann::json(latest_reading_);
+}
+
 void WxArmorDriver::SetPosition(const std::vector<double> &position) {
   std::vector<int32_t> int_command(profile_.joint_ids.size(), 0);
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {

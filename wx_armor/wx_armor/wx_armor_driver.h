@@ -36,6 +36,8 @@ class WxArmorDriver {
   // Blocking. Each call to this should take around 2ms.
   void FetchSensorData();
 
+  nlohmann::json SensorDataToJson() const;
+
   void SetPosition(const std::vector<double> &position);
 
   void StartLoop();
@@ -65,7 +67,7 @@ class WxArmorDriver {
   std::mutex read_handler_mutex_;
   uint8_t read_handler_index_ = 0;
 
-  std::mutex latest_reading_mutex_;
+  mutable std::mutex latest_reading_mutex_;
   SensorData latest_reading_;
 
   // A ControlItem is Dynamixel SDK's terminology of describing the address

@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 
 using drogon::HttpRequestPtr;
@@ -34,9 +35,15 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
                                             const WebSocketMessageType &type) {
   if (type == WebSocketMessageType::Text) {
     if (std::strncmp(message.data(), CMD_READ, 4) == 0) {
-      spdlog::info("READ");
+      nlohmann::json reading = Driver()->SensorDataToJson();
+      conn->send(reading.dump());
     } else if (std::strncmp(message.data(), CMD_SETPOS, 6) == 0) {
-      spdlog::info("SETPOS");
+      nlohmann::json json = nlohmann::json::parse(message);
+      std::vector<double> position(json.size());
+      for (size_t i = 0; i < json.size(); ++i) {
+        position[i] = json.at(i).get<double>();
+      }
+      Driver()->SetPosition(position);
     }
   }
 }
