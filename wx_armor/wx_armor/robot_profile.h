@@ -30,15 +30,16 @@ struct MotorInfo {
 
   std::string name = "unknown";
 
-  OpMode op_mode = OpMode::POSITION;
-
-  MoveMode movement = MoveMode::TIME_BASED;
-  std::chrono::milliseconds movement_vel{0};
-  std::chrono::milliseconds movement_acc{0};
-
   // In case the motor has shadow motors attached to it and requires calibration
   // (of homing offset), store their IDs here.
   std::vector<uint8_t> shadow_motor_ids{};
+
+  // The following information are currently not used at this moment. Having
+  // them here just to be consistent with dynamixel.
+  OpMode op_mode = OpMode::POSITION;
+  MoveMode movement = MoveMode::TIME_BASED;
+  std::chrono::milliseconds movement_vel{0};
+  std::chrono::milliseconds movement_acc{0};
 };
 
 struct RegistryKV {
