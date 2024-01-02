@@ -39,18 +39,32 @@ void StartDriverLoop() {
 void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
                                             std::string &&message,
                                             const WebSocketMessageType &type) {
+  std::string_view payload{};
+  auto Match = [&message, &payload](const char *command) -> bool {
+    size_t command_length = strlen(command);
+    if (std::strncmp(message.data(), command, command_length) == 0) {
+      payload = std::string_view(message.data() + command_length + 1,
+                                 message.size() - command_length - 1);
+      return true;
+    }
+    return false;
+  };
+
   if (type == WebSocketMessageType::Text) {
-    if (std::strncmp(message.data(), CMD_READ, 4) == 0) {
+    if (Match("READ")) {
       nlohmann::json reading = Driver()->SensorDataToJson();
       conn->send(reading.dump());
-    } else if (std::strncmp(message.data(), CMD_SETPOS, 6) == 0) {
-      std::string payload = message.substr(7);
+    } else if (Match("SETPOS")) {
       nlohmann::json json = nlohmann::json::parse(payload);
       std::vector<double> position(json.size());
       for (size_t i = 0; i < json.size(); ++i) {
         position[i] = json.at(i).get<double>();
       }
       Driver()->SetPosition(position);
+    } else if (Match("TORQUE ON")) {
+      Driver()->TorqueOn();
+    } else if (Match("TORQUE OFF")) {
+      Driver()->TorqueOff();
     }
   }
 }

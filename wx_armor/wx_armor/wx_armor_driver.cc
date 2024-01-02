@@ -205,6 +205,9 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     std::abort();
   }
 
+  // Torque off so that we can write EEPROM and calibrate shadow motors.
+  TorqueOff();
+
   // The EEPROM on the motors has a lifespan about 100,000 write
   // cycles. However, reading from eeprom does not affect it lifespan
   //
@@ -213,24 +216,13 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   if (flash_eeprom) {
     FlashEEPROM(&dxl_wb_, profile_);
   }
-
   CalibrateShadowOrDie(&dxl_wb_, profile_);
+
+  // Now torque back on.
+  TorqueOn();
 
   InitReadHandler();
   InitWriteHandler();
-
-  for (int i = 0; i < 10; ++i) {
-    spdlog::info("Start Read.");
-    FetchSensorData();
-    spdlog::info("Positions: {}, {}, {}, {}, {}, {}, {}",
-                 latest_reading_.pos[0],
-                 latest_reading_.pos[1],
-                 latest_reading_.pos[2],
-                 latest_reading_.pos[3],
-                 latest_reading_.pos[4],
-                 latest_reading_.pos[5],
-                 latest_reading_.pos[6]);
-  }
 }
 
 // TODO(breakds): Support fetching position only, and see whether it will be
@@ -239,7 +231,7 @@ void WxArmorDriver::FetchSensorData() {
   std::vector<int32_t> buffer(profile_.joint_ids.size());
   const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
 
-  std::unique_lock<std::mutex> handler_lock{read_handler_mutex_};
+  std::unique_lock<std::mutex> handler_lock{io_mutex_};
   const char *log;
 
   if (!dxl_wb_.syncRead(
@@ -332,12 +324,15 @@ void WxArmorDriver::SetPosition(const std::vector<double> &position) {
 
   const char *log = nullptr;
   const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
-  if (!dxl_wb_.syncWrite(write_position_handler_index_,
-                         profile_.joint_ids.data(),
-                         num_joints,
-                         int_command.data(),
-                         1, /* TODO(breakds) what is it? */
-                         &log)) {
+  std::unique_lock<std::mutex> lock{io_mutex_};
+  bool success = dxl_wb_.syncWrite(write_position_handler_index_,
+                                   profile_.joint_ids.data(),
+                                   num_joints,
+                                   int_command.data(),
+                                   1, /* TODO(breakds) what is it? */
+                                   &log);
+  lock.unlock();
+  if (!success) {
     spdlog::error("Cannot write position command: {}", log);
   }
 }
@@ -349,6 +344,18 @@ void WxArmorDriver::StartLoop() {
       std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
   });
+}
+
+void WxArmorDriver::TorqueOn() {
+  for (const MotorInfo &motor : profile_.motors) {
+    dxl_wb_.torqueOn(motor.id);
+  }
+}
+
+void WxArmorDriver::TorqueOff() {
+  for (const MotorInfo &motor : profile_.motors) {
+    dxl_wb_.torqueOff(motor.id);
+  }
 }
 
 ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {

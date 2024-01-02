@@ -43,6 +43,10 @@ class WxArmorDriver {
 
   void StartLoop();
 
+  void TorqueOn();
+
+  void TorqueOff();
+
  private:
   ControlItem AddItemToRead(const std::string &name);
 
@@ -59,13 +63,15 @@ class WxArmorDriver {
   // ┌───────────────┐
   // │ Info (static) │
   // └───────────────┘
+
   RobotProfile profile_;
 
   // ┌──────────────────┐
   // │ Read             │
   // └──────────────────┘
 
-  std::mutex read_handler_mutex_;
+  std::mutex io_mutex_;
+
   uint8_t read_handler_index_ = 0;
 
   mutable std::mutex latest_reading_mutex_;

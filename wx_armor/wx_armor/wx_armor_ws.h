@@ -39,10 +39,6 @@ class WxArmorWebController
   WS_PATH_LIST_BEGIN
   WS_PATH_ADD("/api/engage", drogon::Get);
   WS_PATH_LIST_END
-
- private:
-  static constexpr char CMD_SETPOS[] = "SETPOS";
-  static constexpr char CMD_READ[] = "READ";
 };
 
 template <typename T>
