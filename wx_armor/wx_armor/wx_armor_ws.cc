@@ -1,6 +1,8 @@
 #include "wx_armor/wx_armor_ws.h"
 
+#include <cstring>
 #include <memory>
+#include <string_view>
 
 #include "nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
@@ -42,7 +44,8 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       nlohmann::json reading = Driver()->SensorDataToJson();
       conn->send(reading.dump());
     } else if (std::strncmp(message.data(), CMD_SETPOS, 6) == 0) {
-      nlohmann::json json = nlohmann::json::parse(message);
+      std::string payload = message.substr(7);
+      nlohmann::json json = nlohmann::json::parse(payload);
       std::vector<double> position(json.size());
       for (size_t i = 0; i < json.size(); ++i) {
         position[i] = json.at(i).get<double>();
