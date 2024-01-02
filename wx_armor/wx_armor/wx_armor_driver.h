@@ -31,7 +31,8 @@ struct SensorData {
 class WxArmorDriver {
  public:
   WxArmorDriver(const std::string &usb_port,
-                std::filesystem::path motor_config_path);
+                std::filesystem::path motor_config_path,
+                bool flash_eeprom = false);
 
   // Blocking. Each call to this should take around 2ms.
   void FetchSensorData();

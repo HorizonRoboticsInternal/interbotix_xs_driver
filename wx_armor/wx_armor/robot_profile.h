@@ -37,31 +37,18 @@ struct MotorInfo {
   std::chrono::milliseconds movement_acc{0};
 };
 
-class EEPROMRegisterTable {
- public:
-  struct Entry {
-    uint8_t motor_id;
-    std::string key;
-    int32_t value;
-  };
+struct RegistryKV {
+  uint8_t motor_id;
+  std::string key;
+  int32_t value;
 
-  EEPROMRegisterTable() = default;
-
-  inline void Add(uint8_t motor_id, const std::string &key, int32_t value) {
-    entries_.emplace_back(Entry{
-        .motor_id = motor_id,
-        .key = key,
-        .value = value,
-    });
-  }
-
- private:
-  std::vector<Entry> entries_;
+  RegistryKV(uint8_t motor_id_, const std::string &key_, int32_t value_)
+      : motor_id(motor_id_), key(key_), value(value_) {}
 };
 
 struct RobotProfile {
   std::vector<MotorInfo> motors{};
-  EEPROMRegisterTable eeprom{};
+  std::vector<RegistryKV> eeprom{};
   // The concept of "Joints" is a subset of all motors. It is a subset
   // because some of the joints can have more than one motors (called
   // "shadow" motors) coverting them.
@@ -108,7 +95,7 @@ struct convert<horizon::wx_armor::RobotProfile> {
         // Ignore "ID" and "Baud_Rate" as they are not valid register
         // names on the motor's internal EEPROM register table.
         if (key == "ID" || key == "Baud_Rate") continue;
-        profile.eeprom.Add(motor_id, key, kv.second.as<int32_t>());
+        profile.eeprom.emplace_back(motor_id, key, kv.second.as<int32_t>());
       }
     }
 

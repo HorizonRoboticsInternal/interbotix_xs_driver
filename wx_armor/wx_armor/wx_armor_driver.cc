@@ -75,10 +75,36 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
   return false;
 }
 
+void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
+  size_t num_failed = 0;
+  for (const RegistryKV &kv : profile.eeprom) {
+    if (!dxl_wb->itemWrite(kv.motor_id, kv.key.c_str(), kv.value)) {
+      spdlog::error(
+          "Failed to flash EEPROM for key value pair ({}, {}) on motor ID = {}",
+          kv.key,
+          kv.value,
+          kv.motor_id);
+      ++num_failed;
+    }
+  }
+
+  if (num_failed > 0) {
+    spdlog::critical(
+        "Failed to flash all registry key value pairs to EEPROM (failure "
+        "{} / {}).",
+        num_failed,
+        profile.eeprom.size());
+  } else {
+    spdlog::info(
+        "Successfully flashed all registry key value pairs to EEPROM.");
+  }
+}
+
 }  // namespace
 
 WxArmorDriver::WxArmorDriver(const std::string &usb_port,
-                             fs::path motor_config_path)
+                             fs::path motor_config_path,
+                             bool flash_eeprom)
     : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()) {
   // Now, initialize the handle, connecting to the specified usb port. It
   // returns false if the initialization fails.
@@ -110,6 +136,15 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     std::abort();
   }
 
+  // The EEPROM on the motors has a lifespan about 100,000 write
+  // cycles. However, reading from eeprom does not affect it lifespan
+  //
+  // TODO(breakds): We should only write to it if we find discrepancies, i.e.
+  // write-on-change.
+  if (flash_eeprom) {
+    FlashEEPROM(&dxl_wb_, profile_);
+  }
+
   InitReadHandler();
   InitWriteHandler();
 
@@ -125,12 +160,6 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
                  latest_reading_.pos[5],
                  latest_reading_.pos[6]);
   }
-
-  // The EEPROM on the motors has a lifespan about 100,000 write
-  // cycles. However, reading from eeprom does not affect it lifespan
-  //
-  // TODO(breakds): We should only write to it if we find discrepancies, i.e.
-  // write-on-change.
 }
 
 // TODO(breakds): Support fetching position only, and see whether it will be
