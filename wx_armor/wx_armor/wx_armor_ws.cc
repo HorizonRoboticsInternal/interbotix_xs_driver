@@ -17,15 +17,17 @@ WxArmorDriver *Driver() {
         GetEnv<std::string>("WX_ARMOR_USB_PORT", "/dev/ttyDXL");
     std::filesystem::path motor_config = GetEnv<std::filesystem::path>(
         "WX_ARMOR_MOTOR_CONFIG",
-        // TODO(breakds): An saner default probably.
-        std::filesystem::path("/home/breakds/projects/interbotix_xs_driver/"
-                              "configs/wx250s_motor_config.yaml"));
+        std::filesystem::path(__FILE__)
+                .parent_path()
+                .parent_path()
+                .parent_path() /
+            "configs" / "wx250s_motor_config.yaml");
     return std::make_unique<WxArmorDriver>(usb_port, motor_config);
   }();
   return driver.get();
 }
 
-void InitDriverLoop() {
+void StartDriverLoop() {
   // This will start the internal reading loop thread.
   Driver()->StartLoop();
 }

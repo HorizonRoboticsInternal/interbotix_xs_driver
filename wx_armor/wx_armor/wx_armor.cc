@@ -8,6 +8,7 @@ using horizon::wx_armor::StartDriverLoop;
 using horizon::wx_armor::WxArmorDriver;
 
 int main(int argc, char** argv) {
+  StartDriverLoop();
   drogon::app()
       .addListener("0.0.0.0", GetEnv<int>("WX_ARMOR_WS_PORT", 8027))
       .setClientMaxWebSocketMessageSize(1 * 1024 * 1024 /* 1MB */)
