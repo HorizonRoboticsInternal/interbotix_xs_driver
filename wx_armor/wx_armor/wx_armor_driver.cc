@@ -78,6 +78,16 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
 void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
   size_t num_failed = 0;
   for (const RegistryKV &kv : profile.eeprom) {
+    int32_t current_value = 0;
+    dxl_wb->itemRead(kv.motor_id, kv.key.c_str(), &current_value);
+
+    // The EEPROM on the motors has a limited number of writes during its
+    // lifespan. Only write when there is a discrepancy between the intended
+    // value and the current value.
+    if (current_value == kv.value) {
+      continue;
+    }
+
     if (!dxl_wb->itemWrite(kv.motor_id, kv.key.c_str(), kv.value)) {
       spdlog::error(
           "Failed to flash EEPROM for key value pair ({}, {}) on motor ID = {}",
