@@ -76,6 +76,8 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
 }
 
 void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
+  const char *log;
+
   size_t num_failed = 0;
   for (const RegistryKV &kv : profile.eeprom) {
     int32_t current_value = 0;
@@ -88,12 +90,14 @@ void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
       continue;
     }
 
-    if (!dxl_wb->itemWrite(kv.motor_id, kv.key.c_str(), kv.value)) {
+    if (!dxl_wb->itemWrite(kv.motor_id, kv.key.c_str(), kv.value, &log)) {
       spdlog::error(
-          "Failed to flash EEPROM for key value pair ({}, {}) on motor ID = {}",
+          "Failed to flash EEPROM for key value pair ({}, {}) on motor ID = "
+          "{}: {}",
           kv.key,
           kv.value,
-          kv.motor_id);
+          kv.motor_id,
+          log);
       ++num_failed;
     }
   }
@@ -126,6 +130,14 @@ void CalibrateShadowOrDie(DynamixelWorkbench *dxl_wb,
     dxl_wb->itemRead(motor.id, "Present_Position", &master_position);
 
     for (int32_t shadow_id : motor.shadow_motor_ids) {
+      // In order to read the baseline shadow position without homing
+      // offset, first set the homing offset to 0.
+      if (!dxl_wb->itemWrite(shadow_id, "Homing_Offset", 0)) {
+        spdlog::critical("Failed to reset homing offset of motor {} to 0.",
+                         shadow_id);
+        std::abort();
+      }
+
       int32_t shadow_position = 0;
       int32_t shadow_drive_mode = 0;
       dxl_wb->itemRead(shadow_id, "Present_Position", &shadow_position);
