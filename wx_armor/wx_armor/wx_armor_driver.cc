@@ -42,7 +42,7 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
   std::set<uint8_t> success{};
 
   for (int i = 0; i < num_trials; ++i) {
-    for (const MotorInfo motor : profile.motors) {
+    for (const MotorInfo &motor : profile.motors) {
       if (success.count(motor.id) > 0) continue;
       if (dxl_wb->ping(motor.id, &log)) {
         success.emplace(motor.id);
@@ -104,9 +104,56 @@ void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
         "{} / {}).",
         num_failed,
         profile.eeprom.size());
+    std::abort();
   } else {
     spdlog::info(
         "Successfully flashed all registry key value pairs to EEPROM.");
+  }
+}
+
+// Calibrate the shadow motors so that their 0 position is identical to the 0
+// position of their corresponding master motor. This is done by setting the
+// homing offset of the shadow motors.
+void CalibrateShadowOrDie(DynamixelWorkbench *dxl_wb,
+                          const RobotProfile &profile) {
+  for (const MotorInfo &motor : profile.motors) {
+    // Skip the motor that does not have any shadow motors to calibrate.
+    if (motor.shadow_motor_ids.empty()) {
+      continue;
+    }
+
+    int32_t master_position = 0;
+    dxl_wb->itemRead(motor.id, "Present_Position", &master_position);
+
+    for (int32_t shadow_id : motor.shadow_motor_ids) {
+      int32_t shadow_position = 0;
+      int32_t shadow_drive_mode = 0;
+      dxl_wb->itemRead(shadow_id, "Present_Position", &shadow_position);
+      dxl_wb->itemRead(shadow_id, "Drive_Mode", &shadow_drive_mode);
+
+      // Now we are going to look at the 1st bit of the drive mode, which
+      // determines whether the motor is in Normal Mode or Reverse Mode.
+      //
+      // drive_mode & 1 == 0, Normal Mode, position⇧ = rotate CCW
+      //
+      // drive_mode & 1 == 1, Reverse Mode, position⇧ = rotate CW
+      int32_t homing_offset = ((shadow_drive_mode & 1) == 0)
+                                  ? shadow_position - master_position
+                                  : master_position - shadow_position;
+      if (!dxl_wb->itemWrite(shadow_id, "Homing_Offset", homing_offset)) {
+        spdlog::critical(
+            "Failed to write homing offset of motor {} during shadow motor "
+            "calibration",
+            shadow_id);
+        std::abort();
+      } else {
+        spdlog::info(
+            "Successfully calibrated motor {} and {} with homing offset = {}",
+            motor.id,
+            shadow_id,
+            homing_offset);
+      }
+    }
   }
 }
 
@@ -154,6 +201,8 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   if (flash_eeprom) {
     FlashEEPROM(&dxl_wb_, profile_);
   }
+
+  CalibrateShadowOrDie(&dxl_wb_, profile_);
 
   InitReadHandler();
   InitWriteHandler();
