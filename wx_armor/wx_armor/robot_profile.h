@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <map>
 #include <vector>
 
 #include "yaml-cpp/yaml.h"
@@ -34,6 +35,10 @@ struct MotorInfo {
   MoveMode movement = MoveMode::TIME_BASED;
   std::chrono::milliseconds movement_vel{0};
   std::chrono::milliseconds movement_acc{0};
+
+  // In case the motor has shadow motors attached to it and requires calibration
+  // (of homing offset), store their IDs here.
+  std::vector<uint8_t> shadow_motor_ids{};
 };
 
 struct RegistryKV {
