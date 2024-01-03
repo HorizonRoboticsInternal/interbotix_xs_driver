@@ -347,12 +347,14 @@ void WxArmorDriver::StartLoop() {
 }
 
 void WxArmorDriver::TorqueOn() {
+  std::lock_guard<std::mutex> lock{io_mutex_};
   for (const MotorInfo &motor : profile_.motors) {
     dxl_wb_.torqueOn(motor.id);
   }
 }
 
 void WxArmorDriver::TorqueOff() {
+  std::lock_guard<std::mutex> lock{io_mutex_};
   for (const MotorInfo &motor : profile_.motors) {
     dxl_wb_.torqueOff(motor.id);
   }
