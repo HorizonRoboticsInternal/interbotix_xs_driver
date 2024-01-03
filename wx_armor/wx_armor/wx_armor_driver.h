@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <filesystem>
 #include <limits>
 #include <memory>
@@ -33,6 +34,8 @@ class WxArmorDriver {
   WxArmorDriver(const std::string &usb_port,
                 std::filesystem::path motor_config_path,
                 bool flash_eeprom = false);
+
+  ~WxArmorDriver();
 
   // Blocking. Each call to this should take around 2ms.
   void FetchSensorData();
@@ -107,6 +110,12 @@ class WxArmorDriver {
   // Similar to how we read, we also write to identical addresses on each
   // motor.
   ControlItem write_position_address_;
+
+  // ┌──────────────────┐
+  // │ Other States     │
+  // └──────────────────┘
+
+  std::atomic_bool shutdown_{false};
 };
 
 }  // namespace horizon::wx_armor

@@ -225,6 +225,13 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   InitWriteHandler();
 }
 
+WxArmorDriver::~WxArmorDriver() {
+  shutdown_.store(true);
+  if (read_loop_thread_.joinable()) {
+    read_loop_thread_.join();
+  }
+}
+
 // TODO(breakds): Support fetching position only, and see whether it will be
 // faster.
 void WxArmorDriver::FetchSensorData() {
@@ -339,7 +346,7 @@ void WxArmorDriver::SetPosition(const std::vector<double> &position) {
 
 void WxArmorDriver::StartLoop() {
   read_loop_thread_ = std::jthread([this]() {
-    while (true) {
+    while (!shutdown_.load(std::memory_order_acquire)) {
       FetchSensorData();
       std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
