@@ -169,6 +169,31 @@ void CalibrateShadowOrDie(DynamixelWorkbench *dxl_wb,
   }
 }
 
+void RebootMotorIfInErrorState(DynamixelWorkbench *dxl_wb,
+                               const RobotProfile &profile) {
+  const char *log;
+  int32_t value = 0;
+  for (const MotorInfo &motor : profile.motors) {
+    bool success =
+        dxl_wb->itemRead(motor.id, "Hardware_Error_Status", &value, &log);
+
+    if (success && value == 0) {
+      continue;
+    } else if (dxl_wb->reboot(motor.id, &log)) {
+      spdlog::info("Motor {} '{}' was in error state, and is rebooted.",
+                   motor.id,
+                   motor.name);
+    } else {
+      spdlog::critical(
+          "Motor {} '{}' was in error state, but fail to reboot it: {}",
+          motor.id,
+          motor.name,
+          log);
+      std::abort();
+    }
+  }
+}
+
 }  // namespace
 
 WxArmorDriver::WxArmorDriver(const std::string &usb_port,
@@ -213,6 +238,7 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   //
   // TODO(breakds): We should only write to it if we find discrepancies, i.e.
   // write-on-change.
+  RebootMotorIfInErrorState(&dxl_wb_, profile_);
   if (flash_eeprom) {
     FlashEEPROM(&dxl_wb_, profile_);
   }
