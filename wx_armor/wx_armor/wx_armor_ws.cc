@@ -56,9 +56,9 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       conn->send(reading.dump());
     } else if (Match("SETPOS")) {
       nlohmann::json json = nlohmann::json::parse(payload);
-      std::vector<double> position(json.size());
+      std::vector<float> position(json.size());
       for (size_t i = 0; i < json.size(); ++i) {
-        position[i] = json.at(i).get<double>();
+        position[i] = json.at(i).get<float>();
       }
       Driver()->SetPosition(position);
     } else if (Match("TORQUE ON")) {

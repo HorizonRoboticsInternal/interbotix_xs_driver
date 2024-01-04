@@ -236,8 +236,6 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   // The EEPROM on the motors has a lifespan about 100,000 write
   // cycles. However, reading from eeprom does not affect it lifespan
   //
-  // TODO(breakds): We should only write to it if we find discrepancies, i.e.
-  // write-on-change.
   RebootMotorIfInErrorState(&dxl_wb_, profile_);
   if (flash_eeprom) {
     FlashEEPROM(&dxl_wb_, profile_);
@@ -258,8 +256,6 @@ WxArmorDriver::~WxArmorDriver() {
   }
 }
 
-// TODO(breakds): Support fetching position only, and see whether it will be
-// faster.
 void WxArmorDriver::FetchSensorData() {
   std::vector<int32_t> buffer(profile_.joint_ids.size());
   const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
@@ -299,9 +295,8 @@ void WxArmorDriver::FetchSensorData() {
   }
 
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    // TODO(breakds): Roll out our own version using double.
-    latest_reading_.pos[i] = static_cast<double>(
-        dxl_wb_.convertValue2Radian(profile_.joint_ids[i], buffer[i]));
+    latest_reading_.pos[i] =
+        dxl_wb_.convertValue2Radian(profile_.joint_ids[i], buffer[i]);
   }
 
   // 2. Extract Velocity
@@ -318,9 +313,8 @@ void WxArmorDriver::FetchSensorData() {
   }
 
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    // TODO(breakds): Roll out our own version using double.
-    latest_reading_.vel[i] = static_cast<double>(
-        dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], buffer[i]));
+    latest_reading_.vel[i] =
+        dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], buffer[i]);
   }
 
   // 3. Extract Current
@@ -337,9 +331,8 @@ void WxArmorDriver::FetchSensorData() {
   }
 
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    // TODO(breakds): Roll out our own version using double.
-    latest_reading_.crt[i] = static_cast<double>(
-        dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]));
+    latest_reading_.crt[i] =
+        dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
   }
 }
 
@@ -348,21 +341,24 @@ nlohmann::json WxArmorDriver::SensorDataToJson() const {
   return nlohmann::json(latest_reading_);
 }
 
-void WxArmorDriver::SetPosition(const std::vector<double> &position) {
+void WxArmorDriver::SetPosition(const std::vector<float> &position) {
   std::vector<int32_t> int_command(profile_.joint_ids.size(), 0);
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    int_command[i] = dxl_wb_.convertRadian2Value(
-        profile_.joint_ids[i], static_cast<float>(position.at(i)));
+    int_command[i] =
+        dxl_wb_.convertRadian2Value(profile_.joint_ids[i], position.at(i));
   }
 
   const char *log = nullptr;
   const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
   std::unique_lock<std::mutex> lock{io_mutex_};
+
+  // NOTE: The number of data for each motor (= 1) in this call to syncWrite()
+  // means that each motor will take one int32_t value from int_command.data().
   bool success = dxl_wb_.syncWrite(write_position_handler_index_,
                                    profile_.joint_ids.data(),
                                    num_joints,
                                    int_command.data(),
-                                   1, /* TODO(breakds) what is it? */
+                                   1, /* number of data for each motor */
                                    &log);
   lock.unlock();
   if (!success) {
@@ -440,7 +436,6 @@ void WxArmorDriver::InitReadHandler() {
 void WxArmorDriver::InitWriteHandler() {
   static constexpr char GOAL_POSITION[] = "Goal_Position";
 
-  // TODO(breakds): Initialize write handler for other operation mode as well.
   if (profile_.motors.front().op_mode != OpMode::POSITION) {
     spdlog::critical("WxArmorDriver not implemented for OpMode != POSITON.");
     std::abort();

@@ -18,9 +18,9 @@ struct SensorData {
   // ┌──────────────────┐
   // │ Per Joint        │
   // └──────────────────┘
-  std::vector<double> pos{};  // joint position
-  std::vector<double> vel{};  // joint velocity
-  std::vector<double> crt{};  // motor electric current
+  std::vector<float> pos{};  // joint position
+  std::vector<float> vel{};  // joint velocity
+  std::vector<float> crt{};  // motor electric current
 
   // The timestamp at which the sensor data is requested, which is approximately
   // when the measurement is taken.
@@ -42,7 +42,7 @@ class WxArmorDriver {
 
   nlohmann::json SensorDataToJson() const;
 
-  void SetPosition(const std::vector<double> &position);
+  void SetPosition(const std::vector<float> &position);
 
   void StartLoop();
 
