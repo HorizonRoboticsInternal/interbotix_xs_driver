@@ -32,6 +32,26 @@ auto LoadConfigOrDie(fs::path config_path) -> YAML::Node {
   }
 }
 
+// The driver is a long running service. There are cases that when the driver
+// starts running (either because of power on or restarted from previous
+// failure) the USB cable connecting the arm (U2D2) and the runnig host (usually
+// a Raspberry Pi) isn't plugged in yet. In this case the driver will be waiting
+// for the port to get ready (i.e. for the cable to be plugged in).
+void WaitUntilPortAvailable(DynamixelWorkbench *dxl_wb,
+                            const std::string usb_port) {
+  while (true) {
+    // Note that for WidowX 250s, if we do not use the default Baudrate 1000000,
+    // the communication between the driver and the robotic arm WILL NOT work.
+    bool success = dxl_wb->init(usb_port.c_str(), DEFAULT_BAUDRATE);
+    if (!success) {
+      spdlog::info("Still waiting for USB port {} to be available ...",
+                   usb_port);
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+  spdlog::info("Successfully connected to {}", usb_port);
+}
+
 auto PingMotors(DynamixelWorkbench *dxl_wb,
                 const RobotProfile &profile,
                 int num_trials = 3,
@@ -200,14 +220,7 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
                              fs::path motor_config_path,
                              bool flash_eeprom)
     : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()) {
-  // Now, initialize the handle, connecting to the specified usb port. It
-  // returns false if the initialization fails.
-  if (dxl_wb_.init(usb_port.c_str(), DEFAULT_BAUDRATE)) {
-    spdlog::info("Successfully connected to {}", usb_port);
-  } else {
-    spdlog::critical("Failed to connect to port {}", usb_port);
-    std::abort();
-  }
+  WaitUntilPortAvailable(&dxl_wb_, usb_port);
 
   if (dxl_wb_.getProtocolVersion() != 2.0) {
     spdlog::critical("Requires protocol 2.0, but got {:.1f}",
