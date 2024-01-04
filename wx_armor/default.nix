@@ -6,6 +6,8 @@
 , dynamixel-workbench
 , yaml-cpp
 , spdlog
+, nlohmann_json
+, drogon
 }:
 
 stdenv.mkDerivation rec {
@@ -21,6 +23,8 @@ stdenv.mkDerivation rec {
     dynamixel-workbench
     yaml-cpp
     spdlog
+    nlohmann_json
+    drogon
   ];
 
   meta = with lib; {
