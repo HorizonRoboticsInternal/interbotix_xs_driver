@@ -17,7 +17,6 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(
         .name = child.first.as<std::string>(),
         // By default, set the operation mode to position control.
         .op_mode = OpMode::POSITION,
-        .movement = MoveMode::VELOCITY_BASED,
     });
 
     // Now, populate the register table.
