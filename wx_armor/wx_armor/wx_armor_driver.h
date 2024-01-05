@@ -36,7 +36,6 @@
 
 #pragma once
 
-#include <atomic>
 #include <filesystem>
 #include <limits>
 #include <memory>
@@ -73,7 +72,8 @@ struct SensorData {
   // └──────────────────┘
 
   // The timestamp at which the sensor data is requested, which is approximately
-  // when the measurement is taken.
+  // when the measurement is taken. Since it is an approximation with around 2ms
+  // error, it is only expected to be used as a reference.
   int64_t timestamp = 0;
 
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(SensorData, pos, vel, crt, timestamp);
@@ -122,13 +122,7 @@ class WxArmorDriver {
    * @details This method is blocking and typically takes around 2ms to
    * complete.
    */
-  void FetchSensorData();
-
-  /**
-   * @brief Converts the latest sensor data to JSON format.
-   * @return A nlohmann::json object representing the current sensor data.
-   */
-  nlohmann::json SensorDataToJson() const;
+  SensorData Read();
 
   /**
    * @brief Sets the position of the robot's joints.
@@ -164,32 +158,6 @@ class WxArmorDriver {
    */
   void TorqueOff();
 
-  /**
-   * @brief Starts a high-frequency sensor reading loop.
-   * @details This method initiates a continuous reading loop that operates at a
-   * high frequency, typically around 500Hz. Within this loop, the latest sensor
-   * data from the robot's joints and motors are read and cached. The cached
-   * data can then be accessed via the SensorDataToJson() method or directly
-   * from the `latest_reading_` member.
-   *
-   * The reading loop runs in its own thread and continuously updates the sensor
-   * data with the most recent readings from the robot, ensuring that the data
-   * reflects the current state of the robot's joints and motors.
-   *
-   * Usage:
-   * @code
-   *   WxArmorDriver driver("/dev/ttyUSB0", "path/to/config.yaml");
-   *   driver.StartLoop();
-   *   // Now the driver is continuously updating the sensor data in the
-   * background
-   * @endcode
-   *
-   * @note It is important to call this method before attempting to fetch or
-   * rely on sensor data, as it populates the `latest_reading_` with up-to-date
-   * information.
-   */
-  void StartLoop();
-
  private:
   ControlItem AddItemToRead(const std::string &name);
 
@@ -217,10 +185,6 @@ class WxArmorDriver {
 
   uint8_t read_handler_index_ = 0;
 
-  // protects read/write on latest_reading_
-  mutable std::mutex latest_reading_mutex_;
-  SensorData latest_reading_;
-
   // A ControlItem is Dynamixel SDK's terminology of describing the address
   // where the corresponding information is stored on each motor. Each address
   // (i.e. ControlItem) consists of a starting address and a length, where the
@@ -235,8 +199,6 @@ class WxArmorDriver {
   uint16_t read_start_ = std::numeric_limits<uint16_t>::max();
   uint16_t read_end_ = 0;
 
-  std::jthread read_loop_thread_{};
-
   // ┌──────────────────┐
   // │ Write            │
   // └──────────────────┘
@@ -249,12 +211,6 @@ class WxArmorDriver {
   // Similar to how we read, we also write to identical addresses on each
   // motor.
   ControlItem write_position_address_;
-
-  // ┌──────────────────┐
-  // │ Other States     │
-  // └──────────────────┘
-
-  std::atomic_bool shutdown_{false};
 };
 
 }  // namespace horizon::wx_armor

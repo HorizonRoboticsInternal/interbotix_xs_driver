@@ -1,9 +1,12 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <type_traits>
 
 #include "drogon/HttpAppFramework.h"
@@ -15,14 +18,13 @@ namespace horizon::wx_armor {
 
 WxArmorDriver *Driver();
 
-void StartDriverLoop();
-
 // This is for bookkeeping purpose. We maintain ClientState for each of the
 // client that talks to the server.
 struct ClientState {
   // Upon connection establishment, engaging is `false`. It is switched to
   // `true` as soon as the first `SETPOS` command is received.
   bool engaging = false;
+
   // Record the time of the last SETPOS command. This can be used to check
   // whether the client stops publishing command for too long.
   std::chrono::time_point<std::chrono::system_clock> latest_healthy_time{};
@@ -49,6 +51,23 @@ class WxArmorWebController
   WS_PATH_LIST_BEGIN
   WS_PATH_ADD("/api/engage", drogon::Get);
   WS_PATH_LIST_END
+
+ private:
+  class Publisher {
+   public:
+    Publisher();
+    ~Publisher();
+    void Register(const drogon::WebSocketConnectionPtr &conn);
+    void Unregister(const drogon::WebSocketConnectionPtr &conn);
+
+   private:
+    std::atomic_bool shutdown_{false};
+    std::mutex conns_mutex_;
+    std::vector<drogon::WebSocketConnectionPtr> conns_{};
+    std::jthread thread_{};
+  };
+
+  Publisher publisher_;
 };
 
 // Helper function to read the environment variable.
