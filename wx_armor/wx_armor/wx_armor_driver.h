@@ -1,3 +1,39 @@
+/**
+ * @file wx_armor_driver.h
+ * @brief Enhanced Driver for Dynamixel Motor-Based Robots, Modified from
+ * Interbotix Stock Driver.
+ *
+ * This file contains the WxArmorDriver class, an enhanced version of the
+ * original stock driver provided by Interbotix for Dynamixel motor-based
+ * robots. While it maintains the fundamental structure and initialization logic
+ * of the original driver, several key improvements and modifications have been
+ * made to enhance its functionality and reliability.
+ *
+ * Key Enhancements and Differences:
+ * 1. **Smart Reboot and EEPROM Writing**:
+ *    - The initialization procedure follows the original driver's logic but
+ * incorporates a 'smart reboot' feature. This feature checks for motors in an
+ * error state during initialization and reboots them if necessary.
+ *    - The EEPROM writing has been optimized to only update values that differ
+ * from their existing state. This selective writing approach helps in extending
+ * the lifespan of the EEPROM.
+ *
+ * 2. **Calibration Consistency**:
+ *    - The calibration process for master motors and their corresponding shadow
+ * motors remains consistent with the original stock driver, ensuring
+ * compatibility and reliability in multi-motor joint configurations.
+ *
+ * 3. **Thread-Safety with Locks**:
+ *    - Thread-safety has been significantly improved by adding locks
+ * (`io_mutex_`) to prevent simultaneous use of the read and write handlers.
+ * This enhancement ensures that the driver can be safely used in multi-threaded
+ * applications without risking data corruption or race conditions.
+ *
+ * @note These enhancements aim to provide a more robust, efficient, and
+ * thread-safe driver while maintaining the core functionalities and
+ * compatibility with the original Interbotix driver.
+ */
+
 #pragma once
 
 #include <atomic>

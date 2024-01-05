@@ -1,6 +1,4 @@
-# This file 'organizes' the motors in any Dynamixel-based robot into meaningful units. Every robot must
-# have at least one instance of this file located in a 'config' directory in their root 'control' ROS package.
-# Note that all parameters are mandatory unless stated otherwise. This file demos the setup for the VX300S robot.
+# This file 'organizes' the motors in any Dynamixel-based robot into meaningful units. The deployment will automatically install this file.
 #
 # Refer to http://emanual.robotis.com/#control-table to look up the control registers for the various motors.
 #

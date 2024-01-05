@@ -1,7 +1,6 @@
 /* This library provides RobotProfile - a class that holds the information about
  * a robot assembled based on and powered by Dynamixel motors.
  *
- *
  * Key concepts are:
  *
  * Joint: Such a robot consists of joints. Each joint is usually 1D rotary where

@@ -360,14 +360,14 @@ nlohmann::json WxArmorDriver::SensorDataToJson() const {
 }
 
 void WxArmorDriver::SetPosition(const std::vector<float> &position) {
-  std::vector<int32_t> int_command(profile_.joint_ids.size(), 0);
+  const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
+  std::vector<int32_t> int_command(num_joints, 0);
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
     int_command[i] =
         dxl_wb_.convertRadian2Value(profile_.joint_ids[i], position.at(i));
   }
 
   const char *log = nullptr;
-  const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
   std::unique_lock<std::mutex> lock{io_mutex_};
 
   // NOTE: The number of data for each motor (= 1) in this call to syncWrite()
