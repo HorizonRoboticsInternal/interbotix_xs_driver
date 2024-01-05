@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 project(interbotix_xs_driver LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)           # Set C++ standard to C++20
-set(CMAKE_CXX_STANDARD_REQUIRED ON)  # Require C++20 support
-# Use C++20 for jthread
-
 include(CMakeDependentOption)
 include(GNUInstallDirs)
 include(InstallRequiredSystemLibraries)
@@ -29,7 +25,6 @@ message(${PATH_TO_VERSION_OUTPUT_DIR})
 include_directories(${PATH_TO_VERSION_OUTPUT_DIR})
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(
   ${PROJECT_NAME} SHARED

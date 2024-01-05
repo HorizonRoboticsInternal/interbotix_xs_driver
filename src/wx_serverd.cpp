@@ -29,16 +29,10 @@ T GetEnv(const char *name, T default_value) {
 }
 
 int main(int argc, char**argv) {
-  int sync = 1;
+  int sync = 0;
   if (argc > 1)
     sync = atoi(argv[1]);
-  int kp = 400;
-  if (argc > 2)
-    kp = atoi(argv[2]);
-  int dt = 20;
-  if (argc > 3)
-    dt = atoi(argv[3]);
-  UDPDaemon daemon(GetEnv<int>("WX_PORT", 9211), (bool) sync, kp, dt);
+  UDPDaemon daemon(GetEnv<int>("WX_PORT", 9211), (bool) sync);
 
   if (GetEnv<bool>("WXD_MOCK", false)) {
     // Run in mock mode

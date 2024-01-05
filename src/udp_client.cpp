@@ -11,7 +11,7 @@ int main() {
 
     udp::resolver resolver(io_service);
     udp::endpoint receiver_endpoint =
-        *resolver.resolve({udp::v4(), "localhost", "9211"}).begin();
+        *resolver.resolve({udp::v4(), "localhost", "30001"}).begin();
     udp::socket socket(io_service);
     socket.open(udp::v4());
 
