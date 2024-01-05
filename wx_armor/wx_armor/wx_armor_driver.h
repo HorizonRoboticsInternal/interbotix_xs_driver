@@ -110,6 +110,10 @@ class WxArmorDriver {
    * method before attempting to move the robot, as it 'energizes' the joints,
    * preparing them for active motion. TorqueOn() will be called automatically
    * upon construction of this driver class.
+   *
+   * @note when the robot is torque back on, it will not remember the previous
+   * position command and goto there. It will remain the position when it is
+   * torqued on.
    */
   void TorqueOn();
 
