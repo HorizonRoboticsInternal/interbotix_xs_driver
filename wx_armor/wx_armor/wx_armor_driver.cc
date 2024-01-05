@@ -39,13 +39,13 @@ auto LoadConfigOrDie(fs::path config_path) -> YAML::Node {
 // for the port to get ready (i.e. for the cable to be plugged in).
 void WaitUntilPortAvailable(DynamixelWorkbench *dxl_wb,
                             const std::string usb_port) {
+  spdlog::info("Still waiting for USB port {} to be available ...", usb_port);
   while (true) {
     // Note that for WidowX 250s, if we do not use the default Baudrate 1000000,
     // the communication between the driver and the robotic arm WILL NOT work.
     bool success = dxl_wb->init(usb_port.c_str(), DEFAULT_BAUDRATE);
-    if (!success) {
-      spdlog::info("Still waiting for USB port {} to be available ...",
-                   usb_port);
+    if (success) {
+      break;
     }
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
