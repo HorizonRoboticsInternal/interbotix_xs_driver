@@ -14,13 +14,27 @@
 
 namespace horizon::wx_armor {
 
+/**
+ * @struct SensorData
+ * @brief Represents sensor readings of the robot's joints.
+ *
+ * This structure encapsulates the sensor data related to the robot's joints,
+ * including positions, velocities, and electric currents of the motors. It also
+ * includes a timestamp to indicate the time at which these readings were taken
+ * or requested *
+ */
 struct SensorData {
   // ┌──────────────────┐
   // │ Per Joint        │
   // └──────────────────┘
+
   std::vector<float> pos{};  // joint position
   std::vector<float> vel{};  // joint velocity
-  std::vector<float> crt{};  // motor electric current
+  std::vector<float> crt{};  // motor electric current of this joint
+
+  // ┌──────────────────┐
+  // │ Metadata         │
+  // └──────────────────┘
 
   // The timestamp at which the sensor data is requested, which is approximately
   // when the measurement is taken.
@@ -29,26 +43,112 @@ struct SensorData {
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(SensorData, pos, vel, crt, timestamp);
 };
 
+/**
+ * @class WxArmorDriver
+ * @brief Driver class for controlling and interfacing with Dynamixel
+ * motor-based robots.
+ *
+ * This class provides the necessary functionalities to control a robot powered
+ * by Dynamixel motors. It includes methods for initializing the robot, fetching
+ * sensor data, setting joint positions, and enabling/disabling motor torque.
+ * The driver communicates with the motors through a specified USB port and
+ * follows configurations defined in a motor configuration file.
+ *
+ * Usage:
+ * @code
+ *   WxArmorDriver driver("/dev/ttyUSB0", "path/to/motor_config.yaml");
+ *   driver.TorqueOn();
+ *   driver.SetPosition({1.0, 1.5, 1.2});
+ *   driver.FetchSensorData();
+ *   auto sensorJson = driver.SensorDataToJson();
+ * @endcode
+ *
+ * @note This driver is specific to robots with Dynamixel motors and requires
+ * the Dynamixel SDK for low-level communications.
+ */
 class WxArmorDriver {
  public:
+  /**
+   * @brief Constructs a WxArmorDriver object.
+   * @param usb_port The USB port through which the robot is connected.
+   * @param motor_config_path Filesystem path to the motor configuration file.
+   * @param flash_eeprom Flag to indicate whether to flash the EEPROM on
+   * construction.
+   */
   WxArmorDriver(const std::string &usb_port,
                 std::filesystem::path motor_config_path,
                 bool flash_eeprom = false);
 
   ~WxArmorDriver();
 
-  // Blocking. Each call to this should take around 2ms.
+  /**
+   * @brief Fetches the latest sensor data from the robot and caches it.
+   * @details This method is blocking and typically takes around 2ms to
+   * complete.
+   */
   void FetchSensorData();
 
+  /**
+   * @brief Converts the latest sensor data to JSON format.
+   * @return A nlohmann::json object representing the current sensor data.
+   */
   nlohmann::json SensorDataToJson() const;
 
+  /**
+   * @brief Sets the position of the robot's joints.
+   * @param position A vector of floats representing the desired joint
+   * positions.
+   */
   void SetPosition(const std::vector<float> &position);
 
-  void StartLoop();
-
+  /**
+   * @brief Activates the torque in the robot's motors.
+   *
+   * @details When this method is called, the motors of the robot's joints start
+   * generating torque based on the provided commands. This enables the robot to
+   * maintain or move to the specified positions. It's essential to call this
+   * method before attempting to move the robot, as it 'energizes' the joints,
+   * preparing them for active motion. TorqueOn() will be called automatically
+   * upon construction of this driver class.
+   */
   void TorqueOn();
 
+  /**
+   * @brief Deactivates the torque in the robot's motors.
+   *
+   * @details Calling this method will cause the motors of the robot's joints to
+   * stop producing torque. As a result, the robot becomes 'soft' and will not
+   * resist external forces. This state is useful for safely handling the robot,
+   * performing maintenance, or when the robot is in a powered-down or idle
+   * state.
+   */
   void TorqueOff();
+
+  /**
+   * @brief Starts a high-frequency sensor reading loop.
+   * @details This method initiates a continuous reading loop that operates at a
+   * high frequency, typically around 500Hz. Within this loop, the latest sensor
+   * data from the robot's joints and motors are read and cached. The cached
+   * data can then be accessed via the SensorDataToJson() method or directly
+   * from the `latest_reading_` member.
+   *
+   * The reading loop runs in its own thread and continuously updates the sensor
+   * data with the most recent readings from the robot, ensuring that the data
+   * reflects the current state of the robot's joints and motors.
+   *
+   * Usage:
+   * @code
+   *   WxArmorDriver driver("/dev/ttyUSB0", "path/to/config.yaml");
+   *   driver.StartLoop();
+   *   // Now the driver is continuously updating the sensor data in the
+   * background
+   * @endcode
+   *
+   * @note It is important to call this method before attempting to fetch or
+   * rely on sensor data, as it populates the `latest_reading_` with up-to-date
+   * information.
+   */
+  void StartLoop();
 
  private:
   ControlItem AddItemToRead(const std::string &name);
@@ -73,10 +173,11 @@ class WxArmorDriver {
   // │ Read             │
   // └──────────────────┘
 
-  std::mutex io_mutex_;
+  std::mutex io_mutex_;  // protects IO from dxl_wb_.
 
   uint8_t read_handler_index_ = 0;
 
+  // protects read/write on latest_reading_
   mutable std::mutex latest_reading_mutex_;
   SensorData latest_reading_;
 
@@ -99,8 +200,6 @@ class WxArmorDriver {
   // ┌──────────────────┐
   // │ Write            │
   // └──────────────────┘
-
-  std::mutex write_handler_mutex_;
 
   // Unlike write, in the future we may have write handler for each of the
   // operation mode (e.g. position control, velocity control, pwm control).
