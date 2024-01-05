@@ -59,17 +59,18 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       nlohmann::json reading = Driver()->SensorDataToJson();
       conn->send(reading.dump());
     } else if (Match("SETPOS")) {
+      // Update the states for bookkeeping purpose.
+      ClientState &state = conn->getContextRef<ClientState>();
+      state.engaging = true;
+      state.latest_healthy_time = std::chrono::system_clock::now();
+
+      // Relay the command to the driver.
       nlohmann::json json = nlohmann::json::parse(payload);
       std::vector<float> position(json.size());
       for (size_t i = 0; i < json.size(); ++i) {
         position[i] = json.at(i).get<float>();
       }
       Driver()->SetPosition(position);
-
-      // Now, update the states for bookkeeping purpose.
-      ClientState &state = conn->getContextRef<ClientState>();
-      state.engaging = true;
-      state.latest_healthy_time = std::chrono::system_clock::now();
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {

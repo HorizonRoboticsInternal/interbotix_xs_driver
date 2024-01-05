@@ -52,6 +52,8 @@ void WaitUntilPortAvailable(DynamixelWorkbench *dxl_wb,
   spdlog::info("Successfully connected to {}", usb_port);
 }
 
+// This makes sure that all the motors defined in the robot profile are
+// reachable. Returns `false` if not all of them are reachable.
 auto PingMotors(DynamixelWorkbench *dxl_wb,
                 const RobotProfile &profile,
                 int num_trials = 3,
@@ -189,6 +191,8 @@ void CalibrateShadowOrDie(DynamixelWorkbench *dxl_wb,
   }
 }
 
+// Check all the motors and see whether there are motors in error state. If so,
+// that motor is rebooted. This function is called at initialization.
 void RebootMotorIfInErrorState(DynamixelWorkbench *dxl_wb,
                                const RobotProfile &profile) {
   const char *log;
@@ -243,14 +247,15 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     std::abort();
   }
 
-  // Torque off so that we can write EEPROM and calibrate shadow motors.
+  // Torque off so that we can write EEPROM, calibrate shadow motors and so on.
   TorqueOff();
 
-  // The EEPROM on the motors has a lifespan about 100,000 write
-  // cycles. However, reading from eeprom does not affect it lifespan
-  //
   RebootMotorIfInErrorState(&dxl_wb_, profile_);
   if (flash_eeprom) {
+    // Note that FlashEEPROM performs "write-on-diff", meaning that it will not
+    // write if the desired value and current value are the same. This can
+    // effectively extend the lifespan of the EEPROM because it has limited
+    // number of writes.
     FlashEEPROM(&dxl_wb_, profile_);
   }
   CalibrateShadowOrDie(&dxl_wb_, profile_);
