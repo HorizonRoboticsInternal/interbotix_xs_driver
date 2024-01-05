@@ -16,10 +16,22 @@ using horizon::wx_armor::StartDriverLoop;
  *
  * The architecture is as simple as illustrated below.
  *
- *  ┌────────┐    ┌───────────┐       ┌─────────┐
- *  │ main() │ ⇨  │ WS Server │  ⇦ ⇨  │ Driver  │
- *  └────────┘    └───────────┘       └─────────┘
- *
+ *  ┌────────┐               ┌───────────┐       ┌─────────┐
+ *  │ Client │ ⇦ WiFi/ETH ⇨  │ WS Server │  ⇦ ⇨  │ Driver  │
+ *  └────────┘               └───────────┘       └─────────┘
+ *                                                    ⇧
+ *                                                   USB
+ *                                                    ⇩
+ *                                               ┌─────────┐
+ *                                               │  U2D2   │
+ *                                               └────┬────┘
+ *                                                    │
+ *                                                    │
+ *                                                    │
+ *                                             ┌──────┼──────┐
+ *                                             │  Dynamixel  │
+ *                                             │   Motors    │
+ *                                             └─────────────┘
  */
 
 int main(int argc, char** argv) {
