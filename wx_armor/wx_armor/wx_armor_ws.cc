@@ -40,6 +40,10 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
                                             std::string &&message,
                                             const WebSocketMessageType &type) {
   std::string_view payload{};
+
+  // Valid message should be in the format of "<COMMAND> <PAYLOAD>". This helper
+  // function try to match the message with predefined command, and if there is
+  // a match, put the payload into `payload`.
   auto Match = [&message, &payload](const char *command) -> bool {
     size_t command_length = strlen(command);
     if (std::strncmp(message.data(), command, command_length) == 0) {
@@ -61,6 +65,11 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
         position[i] = json.at(i).get<float>();
       }
       Driver()->SetPosition(position);
+
+      // Now, update the states for bookkeeping purpose.
+      ClientState &state = conn->getContextRef<ClientState>();
+      state.engaging = true;
+      state.latest_healthy_time = std::chrono::system_clock::now();
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
@@ -71,13 +80,13 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
 
 void WxArmorWebController::handleConnectionClosed(
     const WebSocketConnectionPtr &conn) {
-  spdlog::info("Closed!");
+  spdlog::info("A connection is closed.");
 }
 
 void WxArmorWebController::handleNewConnection(
     const HttpRequestPtr &req, const WebSocketConnectionPtr &conn) {
   conn->setContext(std::make_shared<ClientState>());
-  spdlog::info("Connected");
+  spdlog::info("A new connection is established.");
   conn->send("ok");
 }
 
