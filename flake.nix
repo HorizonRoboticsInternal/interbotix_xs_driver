@@ -2,7 +2,7 @@
   description = "Provides low-level interfaces to easily control an Interbotix X-Series Robot";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/23.11";
     utils.url = "github:numtide/flake-utils";
   };
 
@@ -13,6 +13,9 @@
     };
     overlays.default = nixpkgs.lib.composeManyExtensions [
       self.overlays.dev
+      (final: prev: {
+        wx_armor = final.callPackage ./wx_armor {};
+      })
     ];
   } // utils.lib.eachSystem [
     "x86_64-linux" "aarch64-linux"
@@ -35,24 +38,24 @@
           gcc
           cmake
           cmakeCurses
-          pkgconfig
-          
+          pkg-config
+
           yaml-cpp
           DynamixelSDK
           dynamixel-workbench
           spdlog
           boost
-          websocketpp
           nlohmann_json
+          drogon
         ];
 
         shellHook = ''
           export PS1="$(echo -e '\uf1c0') {\[$(tput sgr0)\]\[\033[38;5;228m\]\w\[$(tput sgr0)\]\[\033[38;5;15m\]} (${name}) \\$ \[$(tput sgr0)\]"
-        '';        
+        '';
       };
 
       packages = {
-        inherit (pkgs) DynamixelSDK dynamixel-workbench;
+        inherit (pkgs) DynamixelSDK dynamixel-workbench wx_armor;
       };
     });
 }
