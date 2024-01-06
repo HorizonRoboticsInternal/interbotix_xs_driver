@@ -64,7 +64,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       }
       Driver()->SetPosition(position);
     } else if (Match("SUBSCRIBE")) {
-      publisher_.Register(conn);
+      publisher_.Subscribe(conn);
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
@@ -75,7 +75,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
 
 void WxArmorWebController::handleConnectionClosed(
     const WebSocketConnectionPtr &conn) {
-  publisher_.Unregister(conn);
+  publisher_.Unsubscribe(conn);
   spdlog::info("A connection is closed.");
 }
 
@@ -108,13 +108,13 @@ WxArmorWebController::Publisher::~Publisher() {
   }
 }
 
-void WxArmorWebController::Publisher::Register(
+void WxArmorWebController::Publisher::Subscribe(
     const WebSocketConnectionPtr &conn) {
   std::lock_guard<std::mutex> lock{conns_mutex_};
   conns_.emplace_back(conn);
 }
 
-void WxArmorWebController::Publisher::Unregister(
+void WxArmorWebController::Publisher::Unsubscribe(
     const WebSocketConnectionPtr &conn) {
   std::lock_guard<std::mutex> lock{conns_mutex_};
   conns_.erase(std::remove(conns_.begin(), conns_.end(), conn), conns_.end());

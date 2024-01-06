@@ -118,7 +118,7 @@ class WxArmorDriver {
   ~WxArmorDriver();
 
   /**
-   * @brief Fetches the latest sensor data from the robot and caches it.
+   * @brief Read the latest sensor data from the robot and returns it.
    * @details This method is blocking and typically takes around 2ms to
    * complete.
    */

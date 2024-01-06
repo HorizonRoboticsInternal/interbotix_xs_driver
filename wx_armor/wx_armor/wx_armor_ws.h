@@ -53,17 +53,26 @@ class WxArmorWebController
   WS_PATH_LIST_END
 
  private:
+  // The publisher is responsible for continuously (by running a background
+  // thread) read the sensor data and publish it to the clients that subscribe
+  // the sensor data.
   class Publisher {
    public:
     Publisher();
     ~Publisher();
-    void Register(const drogon::WebSocketConnectionPtr &conn);
-    void Unregister(const drogon::WebSocketConnectionPtr &conn);
+
+    // Add the client (identified by the connection) to the subscribption list.
+    void Subscribe(const drogon::WebSocketConnectionPtr &conn);
+
+    // Remove the client (identified by the connection) to the subscribption
+    // list.
+    void Unsubscribe(const drogon::WebSocketConnectionPtr &conn);
 
    private:
-    std::atomic_bool shutdown_{false};
-    std::mutex conns_mutex_;
+    std::mutex conns_mutex_;  // protects conns_
     std::vector<drogon::WebSocketConnectionPtr> conns_{};
+
+    std::atomic_bool shutdown_{false};
     std::jthread thread_{};
   };
 
