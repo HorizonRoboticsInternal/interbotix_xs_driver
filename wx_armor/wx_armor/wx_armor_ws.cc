@@ -31,11 +31,6 @@ WxArmorDriver *Driver() {
   return driver.get();
 }
 
-void StartDriverLoop() {
-  // This will start the internal reading loop thread.
-  Driver()->StartLoop();
-}
-
 void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
                                             std::string &&message,
                                             const WebSocketMessageType &type) {
@@ -55,10 +50,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
   };
 
   if (type == WebSocketMessageType::Text) {
-    if (Match("READ")) {
-      nlohmann::json reading = Driver()->SensorDataToJson();
-      conn->send(reading.dump());
-    } else if (Match("SETPOS")) {
+    if (Match("SETPOS")) {
       // Update the states for bookkeeping purpose.
       ClientState &state = conn->getContextRef<ClientState>();
       state.engaging = true;
@@ -71,6 +63,8 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
         position[i] = json.at(i).get<float>();
       }
       Driver()->SetPosition(position);
+    } else if (Match("SUBSCRIBE")) {
+      publisher_.Subscribe(conn);
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
@@ -81,6 +75,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
 
 void WxArmorWebController::handleConnectionClosed(
     const WebSocketConnectionPtr &conn) {
+  publisher_.Unsubscribe(conn);
   spdlog::info("A connection is closed.");
 }
 
@@ -89,6 +84,40 @@ void WxArmorWebController::handleNewConnection(
   conn->setContext(std::make_shared<ClientState>());
   spdlog::info("A new connection is established.");
   conn->send("ok");
+}
+
+WxArmorWebController::Publisher::Publisher() {
+  thread_ = std::jthread([this]() {
+    while (!shutdown_.load()) {
+      SensorData sensor_data = Driver()->Read();
+      std::string message = nlohmann::json(sensor_data).dump();
+      std::unique_lock<std::mutex> lock{conns_mutex_};
+      for (const WebSocketConnectionPtr &conn : conns_) {
+        conn->send(message);
+      }
+      lock.unlock();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  });
+}
+
+WxArmorWebController::Publisher::~Publisher() {
+  shutdown_.store(true);
+  if (thread_.joinable()) {
+    thread_.join();
+  }
+}
+
+void WxArmorWebController::Publisher::Subscribe(
+    const WebSocketConnectionPtr &conn) {
+  std::lock_guard<std::mutex> lock{conns_mutex_};
+  conns_.emplace_back(conn);
+}
+
+void WxArmorWebController::Publisher::Unsubscribe(
+    const WebSocketConnectionPtr &conn) {
+  std::lock_guard<std::mutex> lock{conns_mutex_};
+  conns_.erase(std::remove(conns_.begin(), conns_.end(), conn), conns_.end());
 }
 
 }  // namespace horizon::wx_armor

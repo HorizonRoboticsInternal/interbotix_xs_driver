@@ -33,7 +33,7 @@
    $ websocat ws://<ip>:<port>/api/engage
    ```
    
-   You can issue command like `READ`, `SETPOS [<the joint positions>]`, `TORQUE ON` and `TORQUE OFF`.
+   You can issue command like `SUBSCRIBE`, `SETPOS [<the joint positions>]`, `TORQUE ON` and `TORQUE OFF`.
      
 ## Deployment Guide
 
