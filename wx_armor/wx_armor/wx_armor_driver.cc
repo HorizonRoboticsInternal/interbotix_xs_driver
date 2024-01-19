@@ -171,7 +171,7 @@ void CalibrateShadowOrDie(DynamixelWorkbench *dxl_wb,
       // drive_mode & 1 == 0, Normal Mode, position⇧ = rotate CCW
       //
       // drive_mode & 1 == 1, Reverse Mode, position⇧ = rotate CW
-      int32_t homing_offset = ((shadow_drive_mode & 1) == 0)
+      int32_t homing_offset = ((shadow_drive_mode & 1) == 1)
                                   ? shadow_position - master_position
                                   : master_position - shadow_position;
       if (!dxl_wb->itemWrite(shadow_id, "Homing_Offset", homing_offset)) {
