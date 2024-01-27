@@ -267,16 +267,17 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   InitWriteHandler();
 }
 
-WxArmorDriver::~WxArmorDriver() {
-  shutdown_.store(true);
-  if (read_loop_thread_.joinable()) {
-    read_loop_thread_.join();
-  }
-}
+WxArmorDriver::~WxArmorDriver() {}
 
-void WxArmorDriver::FetchSensorData() {
+SensorData WxArmorDriver::Read() {
   std::vector<int32_t> buffer(profile_.joint_ids.size());
   const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
+
+  SensorData result = SensorData{
+      .pos = std::vector<float>(num_joints),
+      .vel = std::vector<float>(num_joints),
+      .crt = std::vector<float>(num_joints),
+  };
 
   std::unique_lock<std::mutex> handler_lock{io_mutex_};
   const char *log;
@@ -287,17 +288,12 @@ void WxArmorDriver::FetchSensorData() {
     std::abort();
   }
 
-  // No body can hold latest_reading_lock forever, meaning there is no risk of
-  // dead lock here.
-  std::lock_guard<std::mutex> latest_reading_lock{latest_reading_mutex_};
-
   // We use the time here as the timestamp for the latest reading. This is,
   // however, an approximation. It won't be much off because the syncRead above
   // typically takes 2ms to complete.
-  latest_reading_.timestamp =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::system_clock::now().time_since_epoch())
-          .count();
+  result.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::system_clock::now().time_since_epoch())
+                         .count();
 
   // 1. Extract Position
 
@@ -313,7 +309,7 @@ void WxArmorDriver::FetchSensorData() {
   }
 
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    latest_reading_.pos[i] =
+    result.pos[i] =
         dxl_wb_.convertValue2Radian(profile_.joint_ids[i], buffer[i]);
   }
 
@@ -331,7 +327,7 @@ void WxArmorDriver::FetchSensorData() {
   }
 
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    latest_reading_.vel[i] =
+    result.vel[i] =
         dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], buffer[i]);
   }
 
@@ -349,14 +345,11 @@ void WxArmorDriver::FetchSensorData() {
   }
 
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    latest_reading_.crt[i] =
+    result.crt[i] =
         dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
   }
-}
 
-nlohmann::json WxArmorDriver::SensorDataToJson() const {
-  std::lock_guard<std::mutex> lock(latest_reading_mutex_);
-  return nlohmann::json(latest_reading_);
+  return result;
 }
 
 void WxArmorDriver::SetPosition(const std::vector<float> &position) {
@@ -382,15 +375,6 @@ void WxArmorDriver::SetPosition(const std::vector<float> &position) {
   if (!success) {
     spdlog::error("Cannot write position command: {}", log);
   }
-}
-
-void WxArmorDriver::StartLoop() {
-  read_loop_thread_ = std::jthread([this]() {
-    while (!shutdown_.load(std::memory_order_acquire)) {
-      FetchSensorData();
-      std::this_thread::sleep_for(std::chrono::microseconds(1));
-    }
-  });
 }
 
 void WxArmorDriver::TorqueOn() {
@@ -445,10 +429,6 @@ void WxArmorDriver::InitReadHandler() {
                  read_start_,
                  read_end_ - read_start_);
   }
-
-  latest_reading_.pos.resize(profile_.joint_ids.size(), 0.0);
-  latest_reading_.vel.resize(profile_.joint_ids.size(), 0.0);
-  latest_reading_.crt.resize(profile_.joint_ids.size(), 0.0);
 }
 
 void WxArmorDriver::InitWriteHandler() {
