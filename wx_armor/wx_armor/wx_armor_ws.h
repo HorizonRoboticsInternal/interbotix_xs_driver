@@ -74,6 +74,11 @@ class WxArmorWebController
 
     std::atomic_bool shutdown_{false};
     std::jthread thread_{};
+
+    // Book keeping of the number of read errors in a row. Reset to 0 as soon as
+    // a successful read is seen. Server will crash as soon as this number
+    // exceeds the threshold.
+    int num_consecutive_read_errors_ = 0;
   };
 
   Publisher publisher_;
