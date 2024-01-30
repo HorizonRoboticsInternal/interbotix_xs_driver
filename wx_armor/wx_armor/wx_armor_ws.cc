@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <string_view>
 
 #include "nlohmann/json.hpp"
@@ -89,13 +90,14 @@ void WxArmorWebController::handleNewConnection(
 WxArmorWebController::Publisher::Publisher() {
   thread_ = std::jthread([this]() {
     while (!shutdown_.load()) {
-      SensorData sensor_data = Driver()->Read();
-      std::string message = nlohmann::json(sensor_data).dump();
-      std::unique_lock<std::mutex> lock{conns_mutex_};
-      for (const WebSocketConnectionPtr &conn : conns_) {
-        conn->send(message);
+      std::optional<SensorData> sensor_data = Driver()->Read();
+      if (sensor_data.has_value()) {
+        std::string message = nlohmann::json(sensor_data.value()).dump();
+        std::lock_guard<std::mutex> lock{conns_mutex_};
+        for (const WebSocketConnectionPtr &conn : conns_) {
+          conn->send(message);
+        }
       }
-      lock.unlock();
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   });
