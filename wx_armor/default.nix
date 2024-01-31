@@ -1,5 +1,6 @@
 { stdenv
 , lib
+, makeWrapper
 , cmake
 , fetchFromGitHub
 , DynamixelSDK
@@ -16,7 +17,7 @@ stdenv.mkDerivation rec {
 
   src = ./.;
 
-  nativeBuildInputs = [ cmake ];
+  nativeBuildInputs = [ cmake makeWrapper ];
 
   buildInputs = [
     DynamixelSDK
@@ -30,6 +31,8 @@ stdenv.mkDerivation rec {
   postInstall = ''
     mkdir -p $out/etc/wx_armor
     ln -s $src/configs/wx250s_motor_config.yaml $out/etc/wx_armor
+    makeWrapper $out/bin/wx_armor $out/bin/debug_wx_armor \
+        --set WX_ARMOR_MOTOR_CONFIG $out/etc/wx_armor/wx250s_motor_config.yaml
   '';
 
   meta = with lib; {
@@ -38,5 +41,4 @@ stdenv.mkDerivation rec {
     license = licenses.asl20;
     maintainers = with maintainers; [ breakds ];
   };
-
 }

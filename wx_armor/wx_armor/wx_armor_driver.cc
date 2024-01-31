@@ -269,7 +269,7 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
 
 WxArmorDriver::~WxArmorDriver() {}
 
-SensorData WxArmorDriver::Read() {
+std::optional<SensorData> WxArmorDriver::Read() {
   std::vector<int32_t> buffer(profile_.joint_ids.size());
   const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
 
@@ -284,8 +284,8 @@ SensorData WxArmorDriver::Read() {
 
   if (!dxl_wb_.syncRead(
           read_handler_index_, profile_.joint_ids.data(), num_joints, &log)) {
-    spdlog::critical("Failed to syncRead: {}", log);
-    std::abort();
+    spdlog::warn("Failed to syncRead: {}", log);
+    return std::nullopt;
   }
 
   // We use the time here as the timestamp for the latest reading. This is,
@@ -349,7 +349,7 @@ SensorData WxArmorDriver::Read() {
         dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
   }
 
-  return result;
+  return std::move(result);
 }
 
 void WxArmorDriver::SetPosition(const std::vector<float> &position) {

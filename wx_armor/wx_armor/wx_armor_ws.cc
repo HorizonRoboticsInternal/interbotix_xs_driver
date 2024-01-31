@@ -1,7 +1,9 @@
 #include "wx_armor/wx_armor_ws.h"
 
+#include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <string_view>
 
 #include "nlohmann/json.hpp"
@@ -86,16 +88,32 @@ void WxArmorWebController::handleNewConnection(
   conn->send("ok");
 }
 
+static constexpr int MAX_TOLERABLE_CONSECUTIVE_NUM_READ_ERRORS = 6;
+
 WxArmorWebController::Publisher::Publisher() {
   thread_ = std::jthread([this]() {
     while (!shutdown_.load()) {
-      SensorData sensor_data = Driver()->Read();
-      std::string message = nlohmann::json(sensor_data).dump();
-      std::unique_lock<std::mutex> lock{conns_mutex_};
-      for (const WebSocketConnectionPtr &conn : conns_) {
-        conn->send(message);
+      std::optional<SensorData> sensor_data = Driver()->Read();
+      if (sensor_data.has_value()) {
+        num_consecutive_read_errors_ = 0;
+        std::string message = nlohmann::json(sensor_data.value()).dump();
+        std::lock_guard<std::mutex> lock{conns_mutex_};
+        for (const WebSocketConnectionPtr &conn : conns_) {
+          conn->send(message);
+        }
+      } else {
+        // When fail to read, accumulate the counter, check for threshold and
+        // crash if threshold is exceeded.
+        ++num_consecutive_read_errors_;
+        if (num_consecutive_read_errors_ >
+            MAX_TOLERABLE_CONSECUTIVE_NUM_READ_ERRORS) {
+          spdlog::critical(
+              "Encounter {} consecutive read errors, which is considered too "
+              "many. Forcefully shutting down.",
+              num_consecutive_read_errors_);
+          std::abort();
+        }
       }
-      lock.unlock();
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   });

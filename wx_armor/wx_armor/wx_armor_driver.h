@@ -40,6 +40,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <thread>
 
 #include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
@@ -121,8 +122,11 @@ class WxArmorDriver {
    * @brief Read the latest sensor data from the robot and returns it.
    * @details This method is blocking and typically takes around 2ms to
    * complete.
+   *
+   * @return The read sensor data if the read is successful. Or std::nullopt if
+   *         the read fails.
    */
-  SensorData Read();
+  std::optional<SensorData> Read();
 
   /**
    * @brief Sets the position of the robot's joints.
