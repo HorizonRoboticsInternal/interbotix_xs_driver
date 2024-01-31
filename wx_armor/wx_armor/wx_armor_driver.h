@@ -111,10 +111,15 @@ class WxArmorDriver {
    * @param motor_config_path Filesystem path to the motor configuration file.
    * @param flash_eeprom Flag to indicate whether to flash the EEPROM on
    * construction.
+   * @param current_limit The maximum current (torque) that the motor can
+   * generate. It takes value between 0 and 1000. A value of 0 means no current
+   * limit, and a small non-zero current limit protects the robot from
+   * generating too much torque when there is a huge external force/torque.
    */
   WxArmorDriver(const std::string &usb_port,
                 std::filesystem::path motor_config_path,
-                bool flash_eeprom = false);
+                bool flash_eeprom = false,
+                int32_t current_limit = 250);
 
   ~WxArmorDriver();
 
