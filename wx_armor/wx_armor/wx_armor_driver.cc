@@ -191,6 +191,64 @@ void CalibrateShadowOrDie(DynamixelWorkbench *dxl_wb,
   }
 }
 
+// Set the current limit of each motor. The current limit effectively determines
+// the maximum torque each motor can generate. This can protect the gears inside
+// the motor when there is a huge external force being applied (e.g. robot
+// hitting the floor).
+//
+// If the current limit is set to 0, it means that there is no current limit. In
+// this case all the motors will work under "position control" operation mode.
+//
+// If the current limit is a non-zero integer, it means that we want to apply
+// the given current limit. In this case all the motors (except for the
+// XL-series motors) will work under "current-based position control" operation
+// mode, which can be thought of as "position control" operation with a current
+// limit. The XL-series motors will still be under "position control" mode.
+//
+// The WidowX 250s robotic arm has 7 XM-series motors and 2-XL series motors.
+void SetCurrentLimit(DynamixelWorkbench *dxl_wb,
+                     RobotProfile *profile,
+                     int32_t current_limit) {
+  const char *log = nullptr;
+
+  for (MotorInfo &motor : profile->motors) {
+    std::string model_name = dxl_wb->getModelName(motor.id);
+
+    // If the current limit (effectively torque limit) is set to a non-zero
+    // value, we should use current-based position controller as the operation
+    // mode, so that we can set current limit to the motor.
+    //
+    // There is one exception. If the motor is an XL series motor, it does
+    // support current-based position controller operation mode. In this case,
+    // we are still going to use the default position controller operation mode.
+    if (current_limit == 0 || model_name.substr(0, 2) == "XL") {
+      motor.op_mode = OpMode::POSITION;
+      if (!dxl_wb->setPositionControlMode(motor.id, &log)) {
+        spdlog::critical(
+            "Failed to set OpMode to POSITION on motor {} (id = {}): {}",
+            motor.name,
+            motor.id,
+            log);
+        std::abort();
+      }
+    } else {
+      motor.op_mode = OpMode::CURRENT_BASED_POSITION;
+      if (!dxl_wb->currentBasedPositionMode(motor.id, current_limit, &log)) {
+        spdlog::critical(
+            "Failed to set OpMode to POSITION on motor {} (id = {}): {}",
+            motor.name,
+            motor.id,
+            log);
+        std::abort();
+      }
+    }
+    spdlog::info("Successfully set OpMode to {} on motor {} (id = {})",
+                 OpModeName(motor.op_mode),
+                 motor.name,
+                 motor.id);
+  }
+}
+
 // Check all the motors and see whether there are motors in error state. If so,
 // that motor is rebooted. This function is called at initialization.
 void RebootMotorIfInErrorState(DynamixelWorkbench *dxl_wb,
@@ -222,7 +280,8 @@ void RebootMotorIfInErrorState(DynamixelWorkbench *dxl_wb,
 
 WxArmorDriver::WxArmorDriver(const std::string &usb_port,
                              fs::path motor_config_path,
-                             bool flash_eeprom)
+                             bool flash_eeprom,
+                             int32_t current_limit)
     : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()) {
   WaitUntilPortAvailable(&dxl_wb_, usb_port);
 
@@ -259,6 +318,7 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     FlashEEPROM(&dxl_wb_, profile_);
   }
   CalibrateShadowOrDie(&dxl_wb_, profile_);
+  SetCurrentLimit(&dxl_wb_, &profile_, current_limit);
 
   // Now torque back on.
   TorqueOn();
@@ -434,8 +494,12 @@ void WxArmorDriver::InitReadHandler() {
 void WxArmorDriver::InitWriteHandler() {
   static constexpr char GOAL_POSITION[] = "Goal_Position";
 
-  if (profile_.motors.front().op_mode != OpMode::POSITION) {
-    spdlog::critical("WxArmorDriver not implemented for OpMode != POSITON.");
+  OpMode op_mode = profile_.motors.front().op_mode;
+  if (op_mode != OpMode::POSITION &&
+      op_mode != OpMode::CURRENT_BASED_POSITION) {
+    spdlog::critical(
+        "WxArmorDriver only support Operation Mode 'POSITION' and "
+        "'CURRENT_BASED_POSITION'.");
     std::abort();
   }
 

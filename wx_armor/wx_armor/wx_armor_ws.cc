@@ -27,8 +27,9 @@ WxArmorDriver *Driver() {
                 .parent_path() /
             "configs" / "wx250s_motor_config.yaml");
     int flash_eeprom = GetEnv<int>("WX_ARMOR_FLASH_EEPROM", 0);
+    int current_limit = GetEnv<int>("WX_ARMOR_MOTOR_CURRENT_LIMIT", 250);
     return std::make_unique<WxArmorDriver>(
-        usb_port, motor_config, static_cast<bool>(flash_eeprom));
+        usb_port, motor_config, static_cast<bool>(flash_eeprom), current_limit);
   }();
   return driver.get();
 }

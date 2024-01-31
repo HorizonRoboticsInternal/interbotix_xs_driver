@@ -27,6 +27,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <map>
+#include <string_view>
 #include <vector>
 
 #include "yaml-cpp/yaml.h"
@@ -37,12 +38,16 @@ namespace horizon::wx_armor {
 // determines how the underlying controller works and what kind of commands the
 // motor accepts.
 enum class OpMode : int {
-  CURRENT = 0,   // Electric current controller
-  VELOCITY = 1,  // Velocity controller
-  POSITION = 3,  // Position controller
-  PWM = 16,      // Pulse-width modulation controller
-  TORQUE = 100,  // Torque controller
+  CURRENT = 0,                 // Electric current controller
+  VELOCITY = 1,                // Velocity controller
+  POSITION = 3,                // Position controller
+  CURRENT_BASED_POSITION = 5,  // Current based position controller
+  PWM = 16,                    // Pulse-width modulation controller
+  TORQUE = 100,                // Torque controller
 };
+
+// Convert the OpMode enum to a string e.g. for debugging purpose.
+std::string_view OpModeName(OpMode mode);
 
 // Stores the metadata of a Dynamixel motor in the robot. Each motor in the
 // robot is associated with an "ID". When communicating with the motors, the

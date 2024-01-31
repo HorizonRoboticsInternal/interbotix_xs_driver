@@ -80,3 +80,25 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(
 }
 
 }  // namespace YAML
+
+namespace horizon::wx_armor {
+
+std::string_view OpModeName(OpMode mode) {
+  switch (mode) {
+    case OpMode::CURRENT:
+      return "CURRENT";
+    case OpMode::VELOCITY:
+      return "VELOCITY";
+    case OpMode::POSITION:
+      return "POSITION";
+    case OpMode::CURRENT_BASED_POSITION:
+      return "CURRENT_BASED_POSITION";
+    case OpMode::PWM:
+      return "PWM";
+    case OpMode::TORQUE:
+      return "TORQUE";
+  }
+  return "UNKNOWN";
+}
+
+}  // namespace horizon::wx_armor
