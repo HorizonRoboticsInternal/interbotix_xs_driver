@@ -121,6 +121,9 @@ void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
           kv.motor_id,
           log);
       ++num_failed;
+    } else {
+      spdlog::info(
+          "Set {} to {} of motor ID = {})", kv.value, kv.key, kv.motor_id);
     }
   }
 
@@ -134,6 +137,23 @@ void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
   } else {
     spdlog::info(
         "Successfully flashed all registry key value pairs to EEPROM.");
+  }
+
+  for (const MotorInfo &motor : profile.motors) {
+    int32_t value = 0;
+    dxl_wb->itemRead(motor.id, "Profile_Velocity", &value);
+    spdlog::info("Motor {} (id = {}), profile velocity = {}",
+                 motor.id,
+                 motor.name,
+                 value);
+    dxl_wb->itemRead(motor.id, "Profile_Acceleration", &value);
+    spdlog::info("Motor {} (id = {}), profile acceleration = {}",
+                 motor.id,
+                 motor.name,
+                 value);
+    dxl_wb->itemRead(motor.id, "Drive_Mode", &value);
+    spdlog::info(
+        "Motor {} (id = {}), Drive Mode = {}", motor.id, motor.name, value);
   }
 }
 
@@ -310,6 +330,7 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   TorqueOff();
 
   RebootMotorIfInErrorState(&dxl_wb_, profile_);
+  SetCurrentLimit(&dxl_wb_, &profile_, current_limit);
   if (flash_eeprom) {
     // Note that FlashEEPROM performs "write-on-diff", meaning that it will not
     // write if the desired value and current value are the same. This can
@@ -318,7 +339,6 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     FlashEEPROM(&dxl_wb_, profile_);
   }
   CalibrateShadowOrDie(&dxl_wb_, profile_);
-  SetCurrentLimit(&dxl_wb_, &profile_, current_limit);
 
   // Now torque back on.
   TorqueOn();

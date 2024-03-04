@@ -23,7 +23,6 @@ WxArmorDriver *Driver() {
         "WX_ARMOR_MOTOR_CONFIG",
         std::filesystem::path(__FILE__)
                 .parent_path()
-                .parent_path()
                 .parent_path() /
             "configs" / "wx250s_motor_config.yaml");
     int flash_eeprom = GetEnv<int>("WX_ARMOR_FLASH_EEPROM", 0);
