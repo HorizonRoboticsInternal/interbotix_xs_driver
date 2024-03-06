@@ -437,6 +437,39 @@ void WxArmorDriver::SetPosition(const std::vector<float> &position) {
   }
 }
 
+void WxArmorDriver::SetPosition(const std::vector<float> &position,
+                                float moving_time) {
+  int32_t moving_time_ms = static_cast<int32_t>(moving_time * 1000.0);
+  const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
+  std::vector<int32_t> int_command(num_joints * 3, 0);
+  size_t j = 0;
+  for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+    // Profile acceleration
+    int_command[j++] = 0;
+    // Profile velocity
+    int_command[j++] = moving_time_ms;
+    // Goal Position
+    int_command[j++] =
+        dxl_wb_.convertRadian2Value(profile_.joint_ids[i], position.at(i));
+  }
+
+  const char *log = nullptr;
+  std::unique_lock<std::mutex> lock{io_mutex_};
+
+  // NOTE: The number of data for each motor (= 1) in this call to syncWrite()
+  // means that each motor will take one int32_t value from int_command.data().
+  bool success = dxl_wb_.syncWrite(write_position_and_profile_handler_index_,
+                                   profile_.joint_ids.data(),
+                                   num_joints,
+                                   int_command.data(),
+                                   3, /* number of data for each motor */
+                                   &log);
+  lock.unlock();
+  if (!success) {
+    spdlog::error("Cannot write position command: {}", log);
+  }
+}
+
 void WxArmorDriver::TorqueOn() {
   std::lock_guard<std::mutex> lock{io_mutex_};
   for (const MotorInfo &motor : profile_.motors) {
@@ -493,6 +526,8 @@ void WxArmorDriver::InitReadHandler() {
 
 void WxArmorDriver::InitWriteHandler() {
   static constexpr char GOAL_POSITION[] = "Goal_Position";
+  static constexpr char PROFILE_ACC[] = "Profile_Acceleration";
+  static constexpr char PROFILE_VEL[] = "Profile_Velocity";
 
   OpMode op_mode = profile_.motors.front().op_mode;
   if (op_mode != OpMode::POSITION &&
@@ -503,14 +538,15 @@ void WxArmorDriver::InitWriteHandler() {
     std::abort();
   }
 
-  const ControlItem *address =
+  // Add the write handler that writes only the goal position
+  const ControlItem *goal_position_address =
       dxl_wb_.getItemInfo(profile_.joint_ids.front(), GOAL_POSITION);
-  if (address == nullptr) {
+  if (goal_position_address == nullptr) {
     spdlog::critical("Cannot find onboard item '{}' to write.", GOAL_POSITION);
     std::abort();
   }
 
-  write_position_address_ = *address;
+  write_position_address_ = *goal_position_address;
 
   write_position_handler_index_ = dxl_wb_.getTheNumberOfSyncWriteHandler();
   if (!dxl_wb_.addSyncWriteHandler(write_position_address_.address,
@@ -523,6 +559,52 @@ void WxArmorDriver::InitWriteHandler() {
         GOAL_POSITION,
         write_position_address_.address,
         write_position_address_.data_length);
+  }
+
+  // Add the write handler that writes the goal position, as well as
+  // the velocity and acceleration profile.
+  const ControlItem *profile_vel_address =
+      dxl_wb_.getItemInfo(profile_.joint_ids.front(), PROFILE_VEL);
+  const ControlItem *profile_acc_address =
+      dxl_wb_.getItemInfo(profile_.joint_ids.front(), PROFILE_ACC);
+  if (profile_acc_address->address + profile_acc_address->data_length !=
+      profile_vel_address->address) {
+    spdlog::critical(
+        "The register address of profile acceleration is not "
+        "next to that of profile velocity");
+    std::abort();
+  }
+  if (profile_vel_address->address + profile_vel_address->data_length !=
+      goal_position_address->address) {
+    spdlog::critical(
+        "The register address of profile velocity is not "
+        "next to that of goal position");
+    std::abort();
+  }
+
+  write_position_and_profile_handler_index_ =
+      dxl_wb_.getTheNumberOfSyncWriteHandler();
+
+  uint16_t start = profile_acc_address->address;
+  uint16_t length = profile_acc_address->data_length +
+                    profile_vel_address->data_length +
+                    goal_position_address->data_length;
+
+  if (!dxl_wb_.addSyncWriteHandler(start, length)) {
+    spdlog::critical("Failed to add sync write handler for {} + {} + {}",
+                     PROFILE_VEL,
+                     PROFILE_ACC,
+                     GOAL_POSITION);
+    std::abort();
+  } else {
+    spdlog::info(
+        "Registered sync write handler for {} + {} + {} (address = {}, length "
+        "= {})",
+        PROFILE_VEL,
+        PROFILE_ACC,
+        GOAL_POSITION,
+        start,
+        length);
   }
 }
 

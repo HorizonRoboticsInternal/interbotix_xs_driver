@@ -66,6 +66,21 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
         position[i] = json.at(i).get<float>();
       }
       Driver()->SetPosition(position);
+    } else if (Match("MOVETO")) {
+      // Update the states for bookkeeping purpose.
+      ClientState &state = conn->getContextRef<ClientState>();
+      state.engaging = true;
+      state.latest_healthy_time = std::chrono::system_clock::now();
+
+      // Relay the command to the driver. Note that the last numbers
+      // in the list is the moving time, in seconds.
+      nlohmann::json json = nlohmann::json::parse(payload);
+      std::vector<float> position(json.size() - 1);
+      for (size_t i = 0; i < json.size() - 1; ++i) {
+        position[i] = json.at(i).get<float>();
+      }
+      float moving_time = json.at(json.size() - 1).get<float>();
+      Driver()->SetPosition(position, moving_time);
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
