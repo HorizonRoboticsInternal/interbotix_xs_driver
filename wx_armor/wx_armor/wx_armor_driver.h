@@ -141,6 +141,14 @@ class WxArmorDriver {
   void SetPosition(const std::vector<float> &position);
 
   /**
+   * @brief Sets the position of the robot's joints, with a desired moving time.
+   * @param position A vector of floats representing the desired joint
+   * positions.
+   * @param moving_time A float in seconds
+   */
+  void SetPosition(const std::vector<float> &position, float moving_time);
+
+  /**
    * @brief Activates the torque in the robot's motors.
    *
    * @details When this method is called, the motors of the robot's joints start
@@ -220,6 +228,10 @@ class WxArmorDriver {
   // Similar to how we read, we also write to identical addresses on each
   // motor.
   ControlItem write_position_address_;
+
+  // Index to the write handler that writes both the position and velocity and
+  // acceleration profile, and the corresponding register addresses.
+  uint8_t write_position_and_profile_handler_index_;
 };
 
 }  // namespace horizon::wx_armor
