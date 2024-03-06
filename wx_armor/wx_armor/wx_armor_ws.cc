@@ -66,8 +66,6 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
         position[i] = json.at(i).get<float>();
       }
       Driver()->SetPosition(position);
-    } else if (Match("SUBSCRIBE")) {
-      publisher_.Subscribe(conn);
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
@@ -85,6 +83,7 @@ void WxArmorWebController::handleConnectionClosed(
 void WxArmorWebController::handleNewConnection(
     const HttpRequestPtr &req, const WebSocketConnectionPtr &conn) {
   conn->setContext(std::make_shared<ClientState>());
+  publisher_.Subscribe(conn);
   spdlog::info("A new connection is established.");
   conn->send("ok");
 }
