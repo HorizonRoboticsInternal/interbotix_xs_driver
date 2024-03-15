@@ -85,6 +85,9 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
       Driver()->TorqueOff();
+    } else if (Match("SETPID")) {
+      std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
+      Driver()->SetPID(gain_cfgs);
     }
   }
 }

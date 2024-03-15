@@ -122,8 +122,10 @@ void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
           log);
       ++num_failed;
     } else {
-      spdlog::info(
-          "Value '{}' of Motor {} is set to {}.", kv.key, kv.value, kv.motor_id);
+      spdlog::info("Value '{}' of Motor {} is set to {}.",
+                   kv.key,
+                   kv.motor_id,
+                   kv.value);
     }
   }
 
@@ -487,9 +489,40 @@ void WxArmorDriver::TorqueOff() {
   }
 }
 
+void WxArmorDriver::SetPID(const std::vector<PIDGain> &gain_cfgs) {
+  auto SetPIDSingleMotor =
+      [this](uint8_t motor_id, int32_t p, int32_t i, int32_t d) -> void {
+    const char *log;
+    if (!dxl_wb_.itemWrite(motor_id, "Position_P_Gain", p, &log)) {
+      spdlog::error("Failed To set P Gain of motor {}: {}", motor_id, log);
+    }
+    if (!dxl_wb_.itemWrite(motor_id, "Position_I_Gain", i, &log)) {
+      spdlog::error("Failed To set I Gain of motor {}: {}", motor_id, log);
+    }
+    if (!dxl_wb_.itemWrite(motor_id, "Position_D_Gain", d, &log)) {
+      spdlog::error("Failed To set D Gain of motor {}: {}", motor_id, log);
+    }
+    spdlog::info(
+        "Successfully set PID = ({}, {}, {}) for motor {}", p, i, d, motor_id);
+  };
+
+  for (const PIDGain &gain_cfg : gain_cfgs) {
+    if (gain_cfg.name == "all") {
+      for (const MotorInfo &motor : profile_.motors) {
+        SetPIDSingleMotor(motor.id, gain_cfg.p, gain_cfg.i, gain_cfg.d);
+      }
+    } else if (const MotorInfo *motor = profile_.motor(gain_cfg.name)) {
+      SetPIDSingleMotor(motor->id, gain_cfg.p, gain_cfg.i, gain_cfg.d);
+    } else {
+      spdlog::error("Cannot set PID: motor '{}' not found", gain_cfg.name);
+    }
+  }
+}
+
 ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {
-  // Here we assume that the data allocation on all of the motors are identical.
-  // Therefore, we can just read the address of the motor ID and call it a day.
+  // Here we assume that the data allocation on all of the motors are
+  // identical. Therefore, we can just read the address of the motor ID and
+  // call it a day.
   const ControlItem *address =
       dxl_wb_.getItemInfo(profile_.joint_ids.front(), name.c_str());
 
@@ -601,7 +634,8 @@ void WxArmorDriver::InitWriteHandler() {
     std::abort();
   } else {
     spdlog::info(
-        "Registered sync write handler for {} + {} + {} (address = {}, length "
+        "Registered sync write handler for {} + {} + {} (address = {}, "
+        "length "
         "= {})",
         PROFILE_VEL,
         PROFILE_ACC,
