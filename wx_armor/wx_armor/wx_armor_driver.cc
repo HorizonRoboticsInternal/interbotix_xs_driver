@@ -121,6 +121,9 @@ void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
           kv.motor_id,
           log);
       ++num_failed;
+    } else {
+      spdlog::info(
+          "Value '{}' of Motor {} is set to {}.", kv.key, kv.value, kv.motor_id);
     }
   }
 

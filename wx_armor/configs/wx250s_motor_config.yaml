@@ -68,6 +68,8 @@ motors:
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
+    Position_P_Gain: 400
+    Position_D_Gain: 3
 
   shoulder:
     ID: 2
@@ -78,6 +80,8 @@ motors:
     Min_Position_Limit: 819
     Max_Position_Limit: 3345
     Secondary_ID: 255
+    Position_P_Gain: 400
+    Position_D_Gain: 3
 
   shoulder_shadow:
     ID: 3
@@ -88,6 +92,8 @@ motors:
     Min_Position_Limit: 819
     Max_Position_Limit: 3345
     Secondary_ID: 2
+    Position_P_Gain: 400
+    Position_D_Gain: 3
 
   elbow:
     ID: 4
@@ -98,6 +104,8 @@ motors:
     Min_Position_Limit: 648
     Max_Position_Limit: 3094
     Secondary_ID: 255
+    Position_P_Gain: 400
+    Position_D_Gain: 3
 
   elbow_shadow:
     ID: 5
@@ -108,6 +116,8 @@ motors:
     Min_Position_Limit: 648
     Max_Position_Limit: 3094
     Secondary_ID: 4
+    Position_P_Gain: 400
+    Position_D_Gain: 3
 
   forearm_roll:
     ID: 6
@@ -118,6 +128,8 @@ motors:
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
+    Position_P_Gain: 400
+    Position_D_Gain: 3
 
   wrist_angle:
     ID: 7
@@ -128,6 +140,8 @@ motors:
     Min_Position_Limit: 910
     Max_Position_Limit: 3447
     Secondary_ID: 255
+    Position_P_Gain: 400
+    Position_D_Gain: 3
 
   wrist_rotate:
     ID: 8
@@ -138,6 +152,8 @@ motors:
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
+    Position_P_Gain: 500
+    Position_D_Gain: 0
 
   gripper:
     ID: 9
@@ -148,3 +164,5 @@ motors:
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
+    Position_P_Gain: 400
+    Position_D_Gain: 3
