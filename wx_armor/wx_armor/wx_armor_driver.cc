@@ -490,6 +490,8 @@ void WxArmorDriver::TorqueOff() {
 }
 
 void WxArmorDriver::SetPID(const std::vector<PIDGain> &gain_cfgs) {
+  std::lock_guard<std::mutex> lock{io_mutex_};
+
   auto SetPIDSingleMotor =
       [this](uint8_t motor_id, int32_t p, int32_t i, int32_t d) -> void {
     const char *log;

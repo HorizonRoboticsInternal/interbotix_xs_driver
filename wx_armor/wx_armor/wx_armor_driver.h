@@ -99,7 +99,7 @@ struct PIDGain {
   // The derivative gain for the PID controller.
   int32_t d = 0;
 
-  NLOHMANN_DEFINE_TYPE_INTRUSIVE(PIDGain, p, i, d);
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(PIDGain, name, p, i, d);
 };
 
 /**
