@@ -33,7 +33,17 @@
    $ websocat ws://<ip>:<port>/api/engage
    ```
    
-   You can issue command like `SUBSCRIBE`, `SETPOS [<the joint positions>]`, `TORQUE ON` and `TORQUE OFF`.
+   You can issue command like `SUBSCRIBE`, `SETPOS [<the joint positions>]`, `TORQUE ON`, `TORQUE OFF`, and `SETPID`.
+   
+   The command `SETPID` is in the format of 
+   
+   ```console
+   # Set only the "waist" motor's PID gains
+   SETPID [{"name": "waist", "p": 800, "i": 0, "d": 3}]
+   
+   # Set all motor's PID gains, but "wrist_rotate" will have different value
+   SETPID [{"name": "all", "p": 800, "i": 0, "d": 3}, {"name": "wrist_rotate", "p": 400, "i": 0, "d": 0}]
+   ```
      
 ## Deployment Guide
 

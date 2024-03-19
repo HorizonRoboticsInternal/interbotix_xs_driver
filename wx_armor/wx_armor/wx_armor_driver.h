@@ -81,6 +81,28 @@ struct SensorData {
 };
 
 /**
+ * @struct PIDGain
+ * @brief Holds the PID gain values for a specific motor or a group of motors.
+ *
+ * This structure is used to configure the PID gains (Proportional, Integral,
+ * Derivative) for motors in a robot. It supports setting gains by specifying
+ * motor names or applying the same gains to all motors by using "all" as the
+ * motor name.
+ */
+struct PIDGain {
+  //  The name of the motor. Use "all" to apply to all motors.
+  std::string name = "";
+  // The proportional gain for the PID controller.
+  int32_t p = 0;
+  // The integral gain for the PID controller.
+  int32_t i = 0;
+  // The derivative gain for the PID controller.
+  int32_t d = 0;
+
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(PIDGain, name, p, i, d);
+};
+
+/**
  * @class WxArmorDriver
  * @brief Driver class for controlling and interfacing with Dynamixel
  * motor-based robots.
@@ -174,6 +196,32 @@ class WxArmorDriver {
    * state.
    */
   void TorqueOff();
+
+  /**
+   * @brief Sets the PID gains for one or more motors based on the provided
+   * configurations.
+   *
+   * This function iterates through a list of PIDGain configurations,
+   * applying each configuration to the specified motor or all motors.
+   * If a motor's name does not match any in the profile or if "all"
+   * is specified but some motors cannot be configured, an error is
+   * logged. The function aims for flexible and efficient PID
+   * configuration across different motors in a robot using Dynamixel
+   * actuators.
+   *
+   * @param gain_cfgs A vector of PIDGain structures containing the gain
+   * configurations for the motors. Each structure specifies a motor name and
+   * the PID gains to apply. If the name is "all", the gains are applied to all
+   * motors.
+   *
+   * Usage Examples:
+   *     - To set PID gains for a specific motor: [{"name": "waist", "p":
+   * 800, "i": 0, "d": 3}]
+   *     - To set PID gains for all motors, with a different configuration for one
+   * motor: [{"name": "all", "p": 800, "i": 0, "d": 3}, {"name": "wrist",
+   * "p": 400, "i": 0, "d": 0}]
+   */
+  void SetPID(const std::vector<PIDGain> &gain_cfgs);
 
  private:
   ControlItem AddItemToRead(const std::string &name);
