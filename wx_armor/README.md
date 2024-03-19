@@ -41,8 +41,8 @@
    # Set only the "waist" motor's PID gains
    SETPID [{"name": "waist", "p": 800, "i": 0, "d": 3}]
    
-   # Set all motor's PID gains, but "wrist" will have different value
-   SETPID [{"name": "all", "p": 800, "i": 0, "d": 3}, {"name": "wrist", "p": 400, "i": 0, "d": 0}]
+   # Set all motor's PID gains, but "wrist_rotate" will have different value
+   SETPID [{"name": "all", "p": 800, "i": 0, "d": 3}, {"name": "wrist_rotate", "p": 400, "i": 0, "d": 0}]
    ```
      
 ## Deployment Guide
