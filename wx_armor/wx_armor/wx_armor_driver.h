@@ -156,6 +156,13 @@ class WxArmorDriver {
   std::optional<SensorData> Read();
 
   /**
+   * @brief Reads the safety velocity limits from RobotProfile and returns it.
+   *
+   * @return An array containing the safety velocity limits for each motor [rad/s].
+   */
+   std::vector<float> GetSafetyVelocityLimits();
+
+  /**
    * @brief Sets the position of the robot's joints.
    * @param position A vector of floats representing the desired joint
    * positions.
@@ -163,12 +170,15 @@ class WxArmorDriver {
   void SetPosition(const std::vector<float> &position);
 
   /**
-   * @brief Sets the position of the robot's joints, with a desired moving time.
+   * @brief Sets the position of the robot's joints, with a desired moving and 
+   * acceleration time.
+   * @details If acc_time is zero, constant velocity is used.
    * @param position A vector of floats representing the desired joint
    * positions.
    * @param moving_time A float in seconds
+   * @param acc_time A float in seconds
    */
-  void SetPosition(const std::vector<float> &position, float moving_time);
+  void SetPosition(const std::vector<float> &position, float moving_time, float acc_time=0.0);
 
   /**
    * @brief Activates the torque in the robot's motors.
