@@ -29,6 +29,7 @@
 #include <map>
 #include <string_view>
 #include <vector>
+#include <math.h>
 
 #include "yaml-cpp/yaml.h"
 
@@ -68,9 +69,12 @@ struct MotorInfo {
   // The following information are currently not used at this moment. Having
   // them here just to be consistent with dynamixel.
   OpMode op_mode = OpMode::POSITION;
+
+  // The safety velocity limit in [rad/s]
+  float safety_vel_limit = M_PI / 2;
 };
 
-// The EERPROM area of each motor is logically organized as a a few key/value
+// The EERPROM area of each motor is logically organized as a few key/value
 // pairs, similar to a registry. This class is used to represent such a
 // key/value pair, together with their associated motor ID.
 struct RegistryKV {

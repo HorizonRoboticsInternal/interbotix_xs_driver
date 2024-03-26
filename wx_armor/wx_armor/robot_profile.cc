@@ -12,11 +12,17 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(
   for (const auto &child : node["motors"]) {
     YAML::Node info = child.second;
     uint8_t motor_id = info["ID"].as<uint8_t>();
+
+    // Safety velocity limit is given in [deg/s]. Convert it to [rad/s]
+    float safety_vel_limit = info["Safety_Velocity_Limit"].as<float>();
+    safety_vel_limit *= M_PI / 180.;
+
     profile.motors.emplace_back(MotorInfo{
         .id = motor_id,
         .name = child.first.as<std::string>(),
         // By default, set the operation mode to position control.
         .op_mode = OpMode::POSITION,
+        .safety_vel_limit = safety_vel_limit
     });
 
     // Now, populate the register table.
