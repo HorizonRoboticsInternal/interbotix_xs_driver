@@ -233,6 +233,30 @@ class WxArmorDriver {
    */
   void SetPID(const std::vector<PIDGain> &gain_cfgs);
 
+  /**
+   * @brief Returns the current safety violation mode status.
+   *
+   * @return A bool describing whether a safety violation is currently
+   * triggered and not reset.
+   */
+  bool SafetyViolationTriggered();
+
+  /**
+   * @brief Sets off safety violation mode.
+   *
+   * @details For functionality to return to normal, ResetSafetyViolation()
+   * must be called.
+   */
+  void TriggerSafetyViolationMode();
+
+  /**
+   * @brief Resets the safety violation status back to false.
+   *
+   * @note Currently, this gets called only when a new client connection
+   * is made after all previous connections are closed.
+   */
+  void ResetSafetyViolationMode();
+
  private:
   ControlItem AddItemToRead(const std::string &name);
 
@@ -290,6 +314,11 @@ class WxArmorDriver {
   // Index to the write handler that writes both the position and velocity and
   // acceleration profile, and the corresponding register addresses.
   uint8_t write_position_and_profile_handler_index_;
+
+  // Flag that gets triggered when safety violations such as
+  // velocity limits are violated.
+  std::atomic_bool safety_violation_{false};
+
 };
 
 }  // namespace horizon::wx_armor

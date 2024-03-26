@@ -27,8 +27,10 @@
 #                                    of the master. A value of '255' disables this.
 #   9) Safety_Velocity_Limit.........Defines the max safety velocity limit [deg/s]. If the joint velocity ever violates
 #                                    this limit, we override the current policy and attempt to slowly decelerate to a stop.
+#                                    Note that for shadowed motors, though an entry is still expected, this value is unused.
 #   10) Safety_Acceleration_Limit....Defines the max safety acceleration limit [deg/s^2]. If the joint acceleration ever violates
 #                                    this limit, we override the current policy and attempt to slowly decelerate to a stop.
+#                                    Note that for shadowed motors, though an entry is still expected, this value is unused.
 #
 # Each motor's configs are grouped under the name of the joint the motor is controlling. The names are defined at
 # http://support.interbotix.com/ under the 'Specifications' section. (Click a robot and scroll down to the 'Default Joint Limits' section.)

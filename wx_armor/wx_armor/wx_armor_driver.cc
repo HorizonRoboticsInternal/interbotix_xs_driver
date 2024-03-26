@@ -546,8 +546,20 @@ void WxArmorDriver::SetPID(const std::vector<PIDGain> &gain_cfgs) {
   }
 }
 
+bool WxArmorDriver::SafetyViolationTriggered() {
+  return safety_violation_.load();
+}
+
+void WxArmorDriver::TriggerSafetyViolationMode() {
+  safety_violation_ = true;
+}
+
+void WxArmorDriver::ResetSafetyViolationMode() {
+  safety_violation_ = false;
+}
+
 ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {
-  // Here we assume that the data allocation on all of the motors are
+  // Here we assume that the data allocation on all the motors are
   // identical. Therefore, we can just read the address of the motor ID and
   // call it a day.
   const ControlItem *address =

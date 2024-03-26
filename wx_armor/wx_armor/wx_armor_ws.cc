@@ -15,10 +15,6 @@ using drogon::WebSocketMessageType;
 
 namespace horizon::wx_armor {
 
-// Global flag that gets triggered when safety violations such as
-// velocity limits are violated.
-bool safety_violation = false;
-
 WxArmorDriver *Driver() {
   static std::unique_ptr<WxArmorDriver> driver = []() {
     std::string usb_port =
@@ -43,7 +39,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
                                             const WebSocketMessageType &type) {
   std::string_view payload{};
 
-  if (safety_violation) {
+  if (Driver()->SafetyViolationTriggered()) {
     spdlog::error(
         "Call from message handler ignored. Safety violation was encountered.");
     return;
@@ -104,21 +100,21 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
 
 void WxArmorWebController::handleConnectionClosed(
     const WebSocketConnectionPtr &conn) {
-  publisher_.Unsubscribe(conn);
+  guardian_thread_.Unsubscribe(conn);
   spdlog::info("A connection is closed.");
 }
 
 void WxArmorWebController::handleNewConnection(
     const HttpRequestPtr &req, const WebSocketConnectionPtr &conn) {
   conn->setContext(std::make_shared<ClientState>());
-  publisher_.Subscribe(conn);
+  guardian_thread_.Subscribe(conn);
   spdlog::info("A new connection is established.");
   conn->send("ok");
 }
 
 static constexpr int MAX_TOLERABLE_CONSECUTIVE_NUM_READ_ERRORS = 6;
 
-void slowDownToStop(const SensorData &curr_reading,
+void SlowDownToStop(const SensorData &curr_reading,
                     float dt = 0.5,
                     float deceleration_time = 1.5) {
   std::vector<float> curr_pos = curr_reading.pos;
@@ -135,7 +131,7 @@ void slowDownToStop(const SensorData &curr_reading,
   Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
 }
 
-WxArmorWebController::Publisher::Publisher() {
+WxArmorWebController::GuardianThread::GuardianThread() {
   thread_ = std::jthread([this]() {
     std::vector<float> safety_velocity_limits =
         Driver()->GetSafetyVelocityLimits();
@@ -153,21 +149,21 @@ WxArmorWebController::Publisher::Publisher() {
         }
 
         // Don't check for a new safety violation if state hasn't been reset yet
-        if (safety_violation) {
+        if (Driver()->SafetyViolationTriggered()) {
           spdlog::error(
-              "Call from publisher handler ignored. Safety violation was "
-              "encountered.");
+              "Guardian thread safety violation checking ignored. Safety "
+              "violation is already triggered.");
           continue;
         }
 
-        // Publisher also has the dual role of monitoring for safety
+        // GuardianThread also has the dual role of monitoring for safety
         // e.g., checking for velocity limit violations
         std::vector<float> curr_velocities = sensor_data.value().vel;
         for (int i = 0; i < curr_velocities.size(); i++) {
           float cv = fabs(curr_velocities[i]);
           float limit = safety_velocity_limits[i];
           if (cv > limit) {
-            safety_violation = true;
+            Driver()->TriggerSafetyViolationMode();
             break;
           }
         }
@@ -176,9 +172,9 @@ WxArmorWebController::Publisher::Publisher() {
         // and then kill all client connections.
         // This way, user will have to reset on client-side, but the server
         // will keep running.
-        if (safety_violation) {
-          slowDownToStop(sensor_data.value());
-          _KillConnections();
+        if (Driver()->SafetyViolationTriggered()) {
+          SlowDownToStop(sensor_data.value());
+          KillConnections();
         }
 
       } else {
@@ -199,30 +195,30 @@ WxArmorWebController::Publisher::Publisher() {
   });
 }
 
-WxArmorWebController::Publisher::~Publisher() {
+WxArmorWebController::GuardianThread::~GuardianThread() {
   shutdown_.store(true);
   if (thread_.joinable()) {
     thread_.join();
   }
 }
 
-void WxArmorWebController::Publisher::Subscribe(
+void WxArmorWebController::GuardianThread::Subscribe(
     const WebSocketConnectionPtr &conn) {
   // Clear all safety violations only if there are no previous connections
   if (conns_.empty()) {
-    safety_violation = false;
+    Driver()->ResetSafetyViolationMode();
   }
   std::lock_guard<std::mutex> lock{conns_mutex_};
   conns_.emplace_back(conn);
 }
 
-void WxArmorWebController::Publisher::Unsubscribe(
+void WxArmorWebController::GuardianThread::Unsubscribe(
     const WebSocketConnectionPtr &conn) {
   std::lock_guard<std::mutex> lock{conns_mutex_};
   conns_.erase(std::remove(conns_.begin(), conns_.end(), conn), conns_.end());
 }
 
-void WxArmorWebController::Publisher::_KillConnections() {
+void WxArmorWebController::GuardianThread::KillConnections() {
   for (auto &conn : conns_) {
     conn->clearContext();
     conn->forceClose();
