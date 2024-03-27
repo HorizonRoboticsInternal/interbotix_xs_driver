@@ -65,7 +65,11 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       for (size_t i = 0; i < json.size(); ++i) {
         position[i] = json.at(i).get<float>();
       }
-      Driver()->SetPosition(position);
+
+      // NOTE: HACKED TO ALWAYS PERFORM LINEAR PROFILE!
+      // Driver()->SetPosition(position);
+      float ctrl_time = 0.1;
+      Driver()->SetPosition(position, ctrl_time);
     } else if (Match("MOVETO")) {
       // Update the states for bookkeeping purpose.
       ClientState &state = conn->getContextRef<ClientState>();
