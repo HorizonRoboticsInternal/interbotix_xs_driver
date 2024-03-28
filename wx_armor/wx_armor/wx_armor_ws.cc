@@ -220,8 +220,9 @@ void WxArmorWebController::GuardianThread::Unsubscribe(
 
 void WxArmorWebController::GuardianThread::KillConnections() {
   for (auto &conn : conns_) {
-    conn->clearContext();
-    conn->forceClose();
+    // TODO(andrew): log which joint was responsible?
+    conn->shutdown(drogon::CloseCode::kViolation,
+                   "Shutting down due to velocity limit violation.");
   }
   conns_.clear();
 }
