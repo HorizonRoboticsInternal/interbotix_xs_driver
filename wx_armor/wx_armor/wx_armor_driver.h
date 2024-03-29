@@ -156,6 +156,13 @@ class WxArmorDriver {
   std::optional<SensorData> Read();
 
   /**
+   * @brief Reads the safety velocity limits from RobotProfile and returns it.
+   *
+   * @return An array containing the safety velocity limits for each motor [rad/s].
+   */
+   std::vector<float> GetSafetyVelocityLimits();
+
+  /**
    * @brief Sets the position of the robot's joints.
    * @param position A vector of floats representing the desired joint
    * positions.
@@ -163,12 +170,15 @@ class WxArmorDriver {
   void SetPosition(const std::vector<float> &position);
 
   /**
-   * @brief Sets the position of the robot's joints, with a desired moving time.
+   * @brief Sets the position of the robot's joints, with a desired moving and 
+   * acceleration time.
+   * @details If acc_time is zero, constant velocity is used.
    * @param position A vector of floats representing the desired joint
    * positions.
    * @param moving_time A float in seconds
+   * @param acc_time A float in seconds
    */
-  void SetPosition(const std::vector<float> &position, float moving_time);
+  void SetPosition(const std::vector<float> &position, float moving_time, float acc_time=0.0);
 
   /**
    * @brief Activates the torque in the robot's motors.
@@ -222,6 +232,30 @@ class WxArmorDriver {
    * "p": 400, "i": 0, "d": 0}]
    */
   void SetPID(const std::vector<PIDGain> &gain_cfgs);
+
+  /**
+   * @brief Returns the current safety violation mode status.
+   *
+   * @return A bool describing whether a safety violation is currently
+   * triggered and not reset.
+   */
+  bool SafetyViolationTriggered();
+
+  /**
+   * @brief Sets off safety violation mode.
+   *
+   * @details For functionality to return to normal, ResetSafetyViolation()
+   * must be called.
+   */
+  void TriggerSafetyViolationMode();
+
+  /**
+   * @brief Resets the safety violation status back to false.
+   *
+   * @note Currently, this gets called only when a new client connection
+   * is made after all previous connections are closed.
+   */
+  void ResetSafetyViolationMode();
 
  private:
   ControlItem AddItemToRead(const std::string &name);
@@ -280,6 +314,11 @@ class WxArmorDriver {
   // Index to the write handler that writes both the position and velocity and
   // acceleration profile, and the corresponding register addresses.
   uint8_t write_position_and_profile_handler_index_;
+
+  // Flag that gets triggered when safety violations such as
+  // velocity limits are violated.
+  std::atomic_bool safety_violation_{false};
+
 };
 
 }  // namespace horizon::wx_armor

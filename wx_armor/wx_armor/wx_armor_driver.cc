@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <thread>
+#include <cassert>
 
 #include "spdlog/spdlog.h"
 
@@ -103,6 +104,12 @@ void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
   size_t num_failed = 0;
   for (const RegistryKV &kv : profile.eeprom) {
     int32_t current_value = 0;
+
+    // Hacky fix for now... Probably a better way to handle this
+    // Safety_Velocity_Limit is our own custom param. Don't write it to EEPROM
+    if (kv.key == "Safety_Velocity_Limit") {
+      continue;
+    }
     dxl_wb->itemRead(kv.motor_id, kv.key.c_str(), &current_value);
 
     // The EEPROM on the motors has a limited number of writes during its
@@ -417,6 +424,20 @@ std::optional<SensorData> WxArmorDriver::Read() {
   return std::move(result);
 }
 
+std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
+  std::vector<float> safety_velocity_limits;
+
+  int counter = 0;
+  for (const auto &motor : profile_.motors) {
+    // Skip the shadowed motors, which have IDs 3 and 5.
+    if (counter != 3 && counter != 5) {
+      safety_velocity_limits.push_back(motor.safety_vel_limit);
+    }
+    counter++;
+  }
+  return safety_velocity_limits;
+}
+
 void WxArmorDriver::SetPosition(const std::vector<float> &position) {
   const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
   std::vector<int32_t> int_command(num_joints, 0);
@@ -443,14 +464,18 @@ void WxArmorDriver::SetPosition(const std::vector<float> &position) {
 }
 
 void WxArmorDriver::SetPosition(const std::vector<float> &position,
-                                float moving_time) {
+                                float moving_time,
+                                float acc_time) {
+  assert(moving_time / 2 >= acc_time && "Acceleration time cannot be more than half the moving time.");
+
   int32_t moving_time_ms = static_cast<int32_t>(moving_time * 1000.0);
+  int32_t acc_time_ms = static_cast<int32_t>(acc_time * 1000.0);
   const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
   std::vector<int32_t> int_command(num_joints * 3, 0);
   size_t j = 0;
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
     // Profile acceleration
-    int_command[j++] = 0;
+    int_command[j++] = acc_time_ms;
     // Profile velocity
     int_command[j++] = moving_time_ms;
     // Goal Position
@@ -521,8 +546,20 @@ void WxArmorDriver::SetPID(const std::vector<PIDGain> &gain_cfgs) {
   }
 }
 
+bool WxArmorDriver::SafetyViolationTriggered() {
+  return safety_violation_.load();
+}
+
+void WxArmorDriver::TriggerSafetyViolationMode() {
+  safety_violation_ = true;
+}
+
+void WxArmorDriver::ResetSafetyViolationMode() {
+  safety_violation_ = false;
+}
+
 ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {
-  // Here we assume that the data allocation on all of the motors are
+  // Here we assume that the data allocation on all the motors are
   // identical. Therefore, we can just read the address of the motor ID and
   // call it a day.
   const ControlItem *address =
