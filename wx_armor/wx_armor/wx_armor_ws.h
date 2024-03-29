@@ -53,18 +53,19 @@ class WxArmorWebController
   WS_PATH_LIST_END
 
  private:
-  // The publisher is responsible for continuously (by running a background
+  // The GuardianThread is responsible for 1) continuously (by running a background
   // thread) read the sensor data and publish it to the clients that subscribe
-  // the sensor data.
-  class Publisher {
+  // the sensor data and 2) monitoring for safety violations and notifying
+  // WxArmorDriver accordingly to prevent system damage.
+  class GuardianThread {
    public:
-    Publisher();
-    ~Publisher();
+    GuardianThread();
+    ~GuardianThread();
 
-    // Add the client (identified by the connection) to the subscribption list.
+    // Add the client (identified by the connection) to the subscription list.
     void Subscribe(const drogon::WebSocketConnectionPtr &conn);
 
-    // Remove the client (identified by the connection) to the subscribption
+    // Remove the client (identified by the connection) to the subscription
     // list.
     void Unsubscribe(const drogon::WebSocketConnectionPtr &conn);
 
@@ -75,13 +76,16 @@ class WxArmorWebController
     std::atomic_bool shutdown_{false};
     std::jthread thread_{};
 
+    // Close and remove all client connections from subscription list
+    void KillConnections();
+
     // Book keeping of the number of read errors in a row. Reset to 0 as soon as
     // a successful read is seen. Server will crash as soon as this number
     // exceeds the threshold.
     int num_consecutive_read_errors_ = 0;
   };
 
-  Publisher publisher_;
+  GuardianThread guardian_thread_;
 };
 
 // Helper function to read the environment variable.
