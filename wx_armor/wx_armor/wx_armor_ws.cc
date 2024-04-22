@@ -28,8 +28,13 @@ WxArmorDriver *Driver() {
             "configs" / "wx250s_motor_config.yaml");
     int flash_eeprom = true;
     int current_limit = GetEnv<int>("WX_ARMOR_MOTOR_CURRENT_LIMIT", 0);
-    return std::make_unique<WxArmorDriver>(
-        usb_port, motor_config, static_cast<bool>(flash_eeprom), current_limit);
+    bool gripper_use_pwm_control =
+        GetEnv<bool>("WX_ARMOR_GRIPPER_PWM_CTRL", false);
+    return std::make_unique<WxArmorDriver>(usb_port,
+                                           motor_config,
+                                           static_cast<bool>(flash_eeprom),
+                                           current_limit,
+                                           gripper_use_pwm_control);
   }();
   return driver.get();
 }
@@ -59,7 +64,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
   };
 
   if (type == WebSocketMessageType::Text) {
-    if (Match("SETPOS")) {
+    if (Match("SETPOS")) {  // SETPOS is soon to be deprecated.
       // Update the states for bookkeeping purpose.
       ClientState &state = conn->getContextRef<ClientState>();
       state.engaging = true;
@@ -67,11 +72,11 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
 
       // Relay the command to the driver.
       nlohmann::json json = nlohmann::json::parse(payload);
-      std::vector<float> position(json.size());
+      std::vector<float> targets(json.size());
       for (size_t i = 0; i < json.size(); ++i) {
-        position[i] = json.at(i).get<float>();
+        targets[i] = json.at(i).get<float>();
       }
-      Driver()->SetPosition(position, 0.0);
+      Driver()->SendCommand(targets, 0.0);
     } else if (Match("MOVETO")) {
       // Update the states for bookkeeping purpose.
       ClientState &state = conn->getContextRef<ClientState>();
@@ -81,12 +86,12 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       // Relay the command to the driver. Note that the last numbers
       // in the list is the moving time, in seconds.
       nlohmann::json json = nlohmann::json::parse(payload);
-      std::vector<float> position(json.size() - 1);
+      std::vector<float> targets(json.size() - 1);
       for (size_t i = 0; i < json.size() - 1; ++i) {
-        position[i] = json.at(i).get<float>();
+        targets[i] = json.at(i).get<float>();
       }
       float moving_time = json.at(json.size() - 1).get<float>();
-      Driver()->SetPosition(position, moving_time);
+      Driver()->SendCommand(targets, moving_time);
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
@@ -128,7 +133,7 @@ void SlowDownToStop(const SensorData &curr_reading,
   }
 
   // Overwrite the current trajectory with our decelerating one.
-  Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
+  Driver()->SendCommand(targets, deceleration_time, 0.49 * deceleration_time);
 }
 
 WxArmorWebController::GuardianThread::GuardianThread() {

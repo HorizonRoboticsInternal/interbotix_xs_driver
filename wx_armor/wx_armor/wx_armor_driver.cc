@@ -293,7 +293,8 @@ void RebootMotorIfInErrorState(DynamixelWorkbench *dxl_wb,
 WxArmorDriver::WxArmorDriver(const std::string &usb_port,
                              fs::path motor_config_path,
                              bool flash_eeprom,
-                             int32_t current_limit)
+                             int32_t current_limit,
+                             bool gripper_use_pwm_control)
     : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()) {
   WaitUntilPortAvailable(&dxl_wb_, usb_port);
 
@@ -331,6 +332,10 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   }
   CalibrateShadowOrDie(&dxl_wb_, profile_);
   SetCurrentLimit(&dxl_wb_, &profile_, current_limit);
+
+  if (gripper_use_pwm_control) {
+    UsePWMControlOnGripper();
+  }
 
   // Now torque back on.
   TorqueOn();
@@ -438,7 +443,96 @@ std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
   return safety_velocity_limits;
 }
 
-void WxArmorDriver::SetPosition(const std::vector<float> &position,
+namespace {
+
+// This class manages a buffer that is used to store the integer commands that
+// will be sent to the motor. Following Dynamixel's convention, the buffer is
+// organized with DWORD (i.e. 4 bytes) as the unit, where each element is an
+// int32. Currently for each motor we are going to write 5 DWORDs, see below.
+class CommandBuffer {
+ public:
+  // According to Dynamixel:
+  //
+  // Goal PWM         (2 Bytes)     Default =  885 (PWM limit)
+  // Goal Current     (2 Bytes)     Default = 1193 (Current Limit)
+  // Goal Velocity    (4 Bytes)     Default = 131 (Via experiment)
+  // Profile Acc      (4 bytes)     Default = 0
+  // Profile Vel      (4 Bytes)     Default = 0
+  // Goal Position    (4 Bytes)     Default = 0
+  static constexpr int NUM_DWORDS = 5;
+  static constexpr int16_t PWM_LIMIT = 885;
+  static constexpr int16_t CURRENT_LIMIT = 1193;
+  // The Goal PWM and Goal Current share the 4 bytes, with Goal PWM on the low
+  // bits and Goal Current on the high bits.
+  static constexpr int32_t DEFAULT_PWM_CURRENT =
+      (CURRENT_LIMIT << 16) | PWM_LIMIT;
+  static constexpr int32_t DEFAULT_VELOCITY = 131;
+  // The unit that converts torque in N·m to the integer current representation
+  // used in Dyanmixel.
+  static constexpr float NEWTON_METER_TO_INT_CURRENT = CURRENT_LIMIT * 0.666667;
+  // The unit that converts torque in N·m to the integer pwm representation used
+  // in Dyanmixel.
+  static constexpr float NEWTON_METER_TO_INT_PWM = PWM_LIMIT * 0.5;
+
+  CommandBuffer(int num_joints) : buffer_(num_joints * NUM_DWORDS, 0) {
+    // Intialize the Goal PWM and Current. We need to initialize them because
+    // even in other Operation Mode such as position control, those values are
+    // used as limits.
+    for (size_t i = 0; i < buffer_.size(); i += NUM_DWORDS) {
+      buffer_[i] = DEFAULT_PWM_CURRENT;
+      buffer_[i + 1] = DEFAULT_VELOCITY;
+    }
+
+    buffer_ptr_ = buffer_.data();
+  }
+
+  inline void WritePosition(int32_t int_pos,
+                            int32_t moving_time_ms,
+                            int32_t acc_time_ms) {
+    buffer_ptr_[2] = acc_time_ms;
+    buffer_ptr_[3] = moving_time_ms;
+    buffer_ptr_[4] = int_pos;
+    buffer_ptr_ += NUM_DWORDS;
+  }
+
+  inline void WriteCurrent(float tau) {
+    int16_t int_current =
+        static_cast<int16_t>(std::round(NEWTON_METER_TO_INT_CURRENT * tau));
+    buffer_ptr_[0] = (int_current << 16) | PWM_LIMIT;
+    buffer_ptr_ += NUM_DWORDS;
+  }
+
+  inline void WritePWM(float tau) {
+    int16_t int_pwm =
+        static_cast<int16_t>(std::round(NEWTON_METER_TO_INT_PWM * tau));
+    // We need to put the 2 bytes (signed) integer PWM in the position of the
+    // lower 2 bytes at buffer's [0]. This is how we do it.
+    uint16_t unsigned_pwm = static_cast<uint16_t>(int_pwm);
+    buffer_ptr_[0] = 0 | unsigned_pwm;
+    buffer_ptr_ += NUM_DWORDS;
+  }
+
+  inline void WriteVelocity(int32_t int_velocity) {
+    buffer_ptr_[2] = int_velocity;
+    buffer_ptr_ += NUM_DWORDS;
+  }
+
+  inline int32_t *data() {
+    // Returns the content of the buffer. Useful when writing to the motors.
+    return buffer_.data();
+  }
+
+ private:
+  std::vector<int32_t> buffer_{};
+  // Each time a Write* method is called, the buffer_ptr_ will increment by the
+  // number of DWORDs per motor, so that the next Write* method invocation will
+  // write to the area corresponding to the next motor.
+  int32_t *buffer_ptr_ = nullptr;
+};
+
+}  // namespace
+
+void WxArmorDriver::SendCommand(const std::vector<float> &targets,
                                 float moving_time,
                                 float acc_time) {
   assert(moving_time / 2 >= acc_time &&
@@ -447,16 +541,33 @@ void WxArmorDriver::SetPosition(const std::vector<float> &position,
   int32_t moving_time_ms = static_cast<int32_t>(moving_time * 1000.0);
   int32_t acc_time_ms = static_cast<int32_t>(acc_time * 1000.0);
   const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
-  std::vector<int32_t> int_command(num_joints * 3, 0);
-  size_t j = 0;
-  for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    // Profile acceleration
-    int_command[j++] = acc_time_ms;
-    // Profile velocity
-    int_command[j++] = moving_time_ms;
-    // Goal Position
-    int_command[j++] =
-        dxl_wb_.convertRadian2Value(profile_.joint_ids[i], position.at(i));
+  CommandBuffer buffer{num_joints};
+  const float *raw_target = targets.data();
+
+  for (const MotorInfo *motor : profile_.joint_motors) {
+    switch (motor->op_mode) {
+      case OpMode::POSITION:
+      case OpMode::CURRENT_BASED_POSITION:
+        buffer.WritePosition(
+            dxl_wb_.convertRadian2Value(motor->id, *raw_target),
+            moving_time_ms,
+            acc_time_ms);
+        break;
+      case OpMode::CURRENT:
+        buffer.WriteCurrent(*raw_target);
+        break;
+      case OpMode::PWM:
+        buffer.WritePWM(*raw_target);
+        break;
+      case OpMode::VELOCITY:
+        buffer.WriteVelocity(
+            dxl_wb_.convertVelocity2Value(motor->id, *raw_target));
+        break;
+      default:
+        spdlog::critical("Operation Mode {} is not supported",
+                         OpModeName(motor->op_mode));
+    }
+    ++raw_target;
   }
 
   const char *log = nullptr;
@@ -464,12 +575,14 @@ void WxArmorDriver::SetPosition(const std::vector<float> &position,
 
   // NOTE: The number of data for each motor (= 1) in this call to syncWrite()
   // means that each motor will take one int32_t value from int_command.data().
-  bool success = dxl_wb_.syncWrite(write_position_and_profile_handler_index_,
-                                   profile_.joint_ids.data(),
-                                   num_joints,
-                                   int_command.data(),
-                                   3, /* number of data for each motor */
-                                   &log);
+  bool success = dxl_wb_.syncWrite(
+      write_handler_index_,
+      profile_.joint_ids.data(),
+      num_joints,
+      buffer.data(),
+      CommandBuffer::NUM_DWORDS, /* number of words (4 bytes) per motor */
+      &log);
+
   lock.unlock();
   if (!success) {
     spdlog::error("Cannot write position command: {}", log);
@@ -494,31 +607,54 @@ void WxArmorDriver::SetPID(const std::vector<PIDGain> &gain_cfgs) {
   std::lock_guard<std::mutex> lock{io_mutex_};
 
   auto SetPIDSingleMotor =
-      [this](uint8_t motor_id, int32_t p, int32_t i, int32_t d) -> void {
+      [this](const MotorInfo &motor, int32_t p, int32_t i, int32_t d) -> void {
+    if (motor.op_mode != OpMode::POSITION &&
+        motor.op_mode != OpMode::CURRENT_BASED_POSITION) {
+      spdlog::warn(
+          "Motor '{}' is currently in {} control mode, and will ignore PID "
+          "setting.",
+          motor.name,
+          OpModeName(motor.op_mode));
+      return;
+    }
     const char *log;
-    if (!dxl_wb_.itemWrite(motor_id, "Position_P_Gain", p, &log)) {
-      spdlog::error("Failed To set P Gain of motor {}: {}", motor_id, log);
+    if (!dxl_wb_.itemWrite(motor.id, "Position_P_Gain", p, &log)) {
+      spdlog::error("Failed To set P Gain of motor {}: {}", motor.id, log);
     }
-    if (!dxl_wb_.itemWrite(motor_id, "Position_I_Gain", i, &log)) {
-      spdlog::error("Failed To set I Gain of motor {}: {}", motor_id, log);
+    if (!dxl_wb_.itemWrite(motor.id, "Position_I_Gain", i, &log)) {
+      spdlog::error("Failed To set I Gain of motor {}: {}", motor.id, log);
     }
-    if (!dxl_wb_.itemWrite(motor_id, "Position_D_Gain", d, &log)) {
-      spdlog::error("Failed To set D Gain of motor {}: {}", motor_id, log);
+    if (!dxl_wb_.itemWrite(motor.id, "Position_D_Gain", d, &log)) {
+      spdlog::error("Failed To set D Gain of motor {}: {}", motor.id, log);
     }
     spdlog::info(
-        "Successfully set PID = ({}, {}, {}) for motor {}", p, i, d, motor_id);
+        "Successfully set PID = ({}, {}, {}) for motor {}", p, i, d, motor.id);
   };
 
   for (const PIDGain &gain_cfg : gain_cfgs) {
     if (gain_cfg.name == "all") {
       for (const MotorInfo &motor : profile_.motors) {
-        SetPIDSingleMotor(motor.id, gain_cfg.p, gain_cfg.i, gain_cfg.d);
+        SetPIDSingleMotor(motor, gain_cfg.p, gain_cfg.i, gain_cfg.d);
       }
     } else if (const MotorInfo *motor = profile_.motor(gain_cfg.name)) {
-      SetPIDSingleMotor(motor->id, gain_cfg.p, gain_cfg.i, gain_cfg.d);
+      SetPIDSingleMotor(*motor, gain_cfg.p, gain_cfg.i, gain_cfg.d);
     } else {
       spdlog::error("Cannot set PID: motor '{}' not found", gain_cfg.name);
     }
+  }
+}
+
+void WxArmorDriver::UsePWMControlOnGripper() {
+  if (!profile_.UpdateMotorByName("gripper", [this](MotorInfo *motor) {
+        const char *log;
+        if (!dxl_wb_.setPWMControlMode(motor->id, &log)) {
+          spdlog::error("Cannot set gripper control to PWM control: {}", log);
+        } else {
+          motor->op_mode = OpMode::PWM;
+          spdlog::info("Gripper is now updated to use PWM control");
+        }
+      })) {
+    spdlog::error("Cannot find gripper motor.");
   }
 }
 
@@ -572,88 +708,57 @@ void WxArmorDriver::InitReadHandler() {
 }
 
 void WxArmorDriver::InitWriteHandler() {
-  static constexpr char GOAL_POSITION[] = "Goal_Position";
-  static constexpr char PROFILE_ACC[] = "Profile_Acceleration";
-  static constexpr char PROFILE_VEL[] = "Profile_Velocity";
+  const char *prev_item_name = nullptr;
 
-  OpMode op_mode = profile_.motors.front().op_mode;
-  if (op_mode != OpMode::POSITION &&
-      op_mode != OpMode::CURRENT_BASED_POSITION) {
-    spdlog::critical(
-        "WxArmorDriver only support Operation Mode 'POSITION' and "
-        "'CURRENT_BASED_POSITION'.");
+  auto ExtendWriteAddressRange = [this, &prev_item_name](const char *name) {
+    const ControlItem *item =
+        dxl_wb_.getItemInfo(profile_.joint_ids.front(), name);
+
+    if (prev_item_name == nullptr) {
+      write_address_.address = item->address;
+      write_address_.data_length = item->data_length;
+    } else {
+      // Otherwise, extend the current write address (range). However we will
+      // first verify that the next item is an immediate follower.
+      if (write_address_.address + write_address_.data_length !=
+          item->address) {
+        spdlog::critical(
+            "Expecting the address of '{}' to immediately follow "
+            "the address of '{}'. However, getting {} instead of {}",
+            name,
+            prev_item_name,
+            item->address,
+            write_address_.address + write_address_.data_length);
+        std::abort();
+      }
+      write_address_.data_length += item->data_length;
+    }
+    prev_item_name = name;
+  };
+
+  // First retrieve all the addresses of interest, and ensure that they form a
+  // contiguous address range and follow the expected order. The resulting write
+  // address range will be stored in `write_address_`.
+  ExtendWriteAddressRange("Goal_PWM");
+  ExtendWriteAddressRange("Goal_Current");
+  ExtendWriteAddressRange("Goal_Velocity");
+  ExtendWriteAddressRange("Profile_Acceleration");
+  ExtendWriteAddressRange("Profile_Velocity");
+  ExtendWriteAddressRange("Goal_Position");
+
+  // Next, creates the write handler.
+  write_handler_index_ = dxl_wb_.getTheNumberOfSyncWriteHandler();
+
+  const char *log = nullptr;
+  if (!dxl_wb_.addSyncWriteHandler(
+          write_address_.address, write_address_.data_length, &log)) {
+    spdlog::critical("Failed to create the sync writer: {}", log);
     std::abort();
   }
 
-  // Add the write handler that writes only the goal position
-  const ControlItem *goal_position_address =
-      dxl_wb_.getItemInfo(profile_.joint_ids.front(), GOAL_POSITION);
-  if (goal_position_address == nullptr) {
-    spdlog::critical("Cannot find onboard item '{}' to write.", GOAL_POSITION);
-    std::abort();
-  }
-
-  write_position_address_ = *goal_position_address;
-
-  write_position_handler_index_ = dxl_wb_.getTheNumberOfSyncWriteHandler();
-  if (!dxl_wb_.addSyncWriteHandler(write_position_address_.address,
-                                   write_position_address_.data_length)) {
-    spdlog::critical("Failed to add sync write handler for {}", GOAL_POSITION);
-    std::abort();
-  } else {
-    spdlog::info(
-        "Registered sync write handler for {} (address = {}, length = {})",
-        GOAL_POSITION,
-        write_position_address_.address,
-        write_position_address_.data_length);
-  }
-
-  // Add the write handler that writes the goal position, as well as
-  // the velocity and acceleration profile.
-  const ControlItem *profile_vel_address =
-      dxl_wb_.getItemInfo(profile_.joint_ids.front(), PROFILE_VEL);
-  const ControlItem *profile_acc_address =
-      dxl_wb_.getItemInfo(profile_.joint_ids.front(), PROFILE_ACC);
-  if (profile_acc_address->address + profile_acc_address->data_length !=
-      profile_vel_address->address) {
-    spdlog::critical(
-        "The register address of profile acceleration is not "
-        "next to that of profile velocity");
-    std::abort();
-  }
-  if (profile_vel_address->address + profile_vel_address->data_length !=
-      goal_position_address->address) {
-    spdlog::critical(
-        "The register address of profile velocity is not "
-        "next to that of goal position");
-    std::abort();
-  }
-
-  write_position_and_profile_handler_index_ =
-      dxl_wb_.getTheNumberOfSyncWriteHandler();
-
-  uint16_t start = profile_acc_address->address;
-  uint16_t length = profile_acc_address->data_length +
-                    profile_vel_address->data_length +
-                    goal_position_address->data_length;
-
-  if (!dxl_wb_.addSyncWriteHandler(start, length)) {
-    spdlog::critical("Failed to add sync write handler for {} + {} + {}",
-                     PROFILE_VEL,
-                     PROFILE_ACC,
-                     GOAL_POSITION);
-    std::abort();
-  } else {
-    spdlog::info(
-        "Registered sync write handler for {} + {} + {} (address = {}, "
-        "length "
-        "= {})",
-        PROFILE_VEL,
-        PROFILE_ACC,
-        GOAL_POSITION,
-        start,
-        length);
-  }
+  spdlog::info("Registered sync writer handler (address = {}, length = {})",
+               write_address_.address,
+               write_address_.data_length);
 }
 
 }  // namespace horizon::wx_armor
