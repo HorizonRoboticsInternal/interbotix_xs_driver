@@ -1,9 +1,9 @@
 #include "wx_armor/wx_armor_driver.h"
 
+#include <cassert>
 #include <chrono>
 #include <cstdlib>
 #include <thread>
-#include <cassert>
 
 #include "spdlog/spdlog.h"
 
@@ -438,35 +438,11 @@ std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
   return safety_velocity_limits;
 }
 
-void WxArmorDriver::SetPosition(const std::vector<float> &position) {
-  const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
-  std::vector<int32_t> int_command(num_joints, 0);
-  for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-    int_command[i] =
-        dxl_wb_.convertRadian2Value(profile_.joint_ids[i], position.at(i));
-  }
-
-  const char *log = nullptr;
-  std::unique_lock<std::mutex> lock{io_mutex_};
-
-  // NOTE: The number of data for each motor (= 1) in this call to syncWrite()
-  // means that each motor will take one int32_t value from int_command.data().
-  bool success = dxl_wb_.syncWrite(write_position_handler_index_,
-                                   profile_.joint_ids.data(),
-                                   num_joints,
-                                   int_command.data(),
-                                   1, /* number of data for each motor */
-                                   &log);
-  lock.unlock();
-  if (!success) {
-    spdlog::error("Cannot write position command: {}", log);
-  }
-}
-
 void WxArmorDriver::SetPosition(const std::vector<float> &position,
                                 float moving_time,
                                 float acc_time) {
-  assert(moving_time / 2 >= acc_time && "Acceleration time cannot be more than half the moving time.");
+  assert(moving_time / 2 >= acc_time &&
+         "Acceleration time cannot be more than half the moving time.");
 
   int32_t moving_time_ms = static_cast<int32_t>(moving_time * 1000.0);
   int32_t acc_time_ms = static_cast<int32_t>(acc_time * 1000.0);
@@ -550,13 +526,9 @@ bool WxArmorDriver::SafetyViolationTriggered() {
   return safety_violation_.load();
 }
 
-void WxArmorDriver::TriggerSafetyViolationMode() {
-  safety_violation_ = true;
-}
+void WxArmorDriver::TriggerSafetyViolationMode() { safety_violation_ = true; }
 
-void WxArmorDriver::ResetSafetyViolationMode() {
-  safety_violation_ = false;
-}
+void WxArmorDriver::ResetSafetyViolationMode() { safety_violation_ = false; }
 
 ControlItem WxArmorDriver::AddItemToRead(const std::string &name) {
   // Here we assume that the data allocation on all the motors are

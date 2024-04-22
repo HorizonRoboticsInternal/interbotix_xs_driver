@@ -158,19 +158,13 @@ class WxArmorDriver {
   /**
    * @brief Reads the safety velocity limits from RobotProfile and returns it.
    *
-   * @return An array containing the safety velocity limits for each motor [rad/s].
+   * @return An array containing the safety velocity limits for each motor
+   *         [rad/s].
    */
-   std::vector<float> GetSafetyVelocityLimits();
+  std::vector<float> GetSafetyVelocityLimits();
 
   /**
-   * @brief Sets the position of the robot's joints.
-   * @param position A vector of floats representing the desired joint
-   * positions.
-   */
-  void SetPosition(const std::vector<float> &position);
-
-  /**
-   * @brief Sets the position of the robot's joints, with a desired moving and 
+   * @brief Sets the position of the robot's joints, with a desired moving and
    * acceleration time.
    * @details If acc_time is zero, constant velocity is used.
    * @param position A vector of floats representing the desired joint
@@ -178,7 +172,9 @@ class WxArmorDriver {
    * @param moving_time A float in seconds
    * @param acc_time A float in seconds
    */
-  void SetPosition(const std::vector<float> &position, float moving_time, float acc_time=0.0);
+  void SetPosition(const std::vector<float> &position,
+                   float moving_time,
+                   float acc_time = 0.0);
 
   /**
    * @brief Activates the torque in the robot's motors.
@@ -226,10 +222,10 @@ class WxArmorDriver {
    *
    * Usage Examples:
    *     - To set PID gains for a specific motor: [{"name": "waist", "p":
-   * 800, "i": 0, "d": 3}]
-   *     - To set PID gains for all motors, with a different configuration for one
-   * motor: [{"name": "all", "p": 800, "i": 0, "d": 3}, {"name": "wrist",
-   * "p": 400, "i": 0, "d": 0}]
+   *       800, "i": 0, "d": 3}]
+   *     - To set PID gains for all motors, with a different configuration for
+   *       one motor: [{"name": "all", "p": 800, "i": 0, "d": 3}, {"name":
+   *       "wrist", "p": 400, "i": 0, "d": 0}]
    */
   void SetPID(const std::vector<PIDGain> &gain_cfgs);
 
@@ -318,7 +314,6 @@ class WxArmorDriver {
   // Flag that gets triggered when safety violations such as
   // velocity limits are violated.
   std::atomic_bool safety_violation_{false};
-
 };
 
 }  // namespace horizon::wx_armor
