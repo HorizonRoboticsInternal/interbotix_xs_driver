@@ -318,6 +318,10 @@ class WxArmorDriver {
   // The current gripper position to be updated by Read().
   // Used for delta control when gripper is closing.
   std::atomic<double> gripper_position_{1.0};
+
+  // A tracker for how many iterations the gripper has been closing for
+  // without an open command.
+  int32_t closing_iters_{0};
 };
 
 }  // namespace horizon::wx_armor

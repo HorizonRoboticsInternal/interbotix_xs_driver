@@ -383,12 +383,9 @@ std::optional<SensorData> WxArmorDriver::Read() {
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
     result.pos[i] =
         dxl_wb_.convertValue2Radian(profile_.joint_ids[i], buffer[i]);
-
-    // Record the current gripper position for delta closing control
-    if (i == profile_.joint_ids.size() - 1) {
-      gripper_position_ = result.pos[i];
-    }
   }
+  // Record the current gripper position for delta closing control
+  gripper_position_ = result.pos[profile_.joint_ids.size() - 1];
 
   // 2. Extract Velocity
 
@@ -449,37 +446,37 @@ void WxArmorDriver::SetPosition(const std::vector<float> &position,
   assert(moving_time / 2 >= acc_time &&
          "Acceleration time cannot be more than half the moving time.");
 
-  static int32_t closing_iters = 0;
   int32_t moving_time_ms = static_cast<int32_t>(moving_time * 1000.0);
   int32_t acc_time_ms = static_cast<int32_t>(acc_time * 1000.0);
   const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
   std::vector<int32_t> int_command(num_joints * 3, 0);
+
+  // Gripper delta control when closing
+  size_t gi = profile_.joint_ids.size() - 1;  // gripper index
+  // Here, the gripper is opening.
+  if (position.at(gi) > 0.5) {
+    closing_iters_ = 0;
+  }
+  // Here, the gripper is closing.
+  else {
+    if (closing_iters_ > 5) {
+      // After closing for a set number of iterations, we can alleviate
+      // the grasp to a less aggressive position goal to prevent
+      // gripper motor overload.
+      // It's crucial to allow closing using the policy's output for a
+      // certain amount of iterations so that dynamics do not get altered.
+      position.at(gi) = std::max(gripper_position_.load() - 0.1, 0.0);
+    }
+    closing_iters_++;
+  }
+
   size_t j = 0;
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
     // Profile acceleration
     int_command[j++] = acc_time_ms;
     // Profile velocity
     int_command[j++] = moving_time_ms;
-
-    // Goal position for gripper
-    if (i == profile_.joint_ids.size() - 1) {
-      // Here, the gripper is opening.
-      if (position.at(i) > 0.5) {
-        closing_iters = 0;
-      }
-      // Here, the gripper is closing.
-      else {
-        if (closing_iters > 5) {
-          // After closing for a set amount of iterations, we can alleviate
-          // the grasp to a less aggressive position goal to prevent faults.
-          // It's crucial to allow closing using the policy's output for a
-          // certain amount of iterations so that dynamics do not get altered.
-          position.at(i) = std::max(gripper_position_.load() - 0.1, 0.0);
-        }
-        closing_iters++;
-      }
-    }
-    // Set position goal
+    // Goal position
     int_command[j++] =
         dxl_wb_.convertRadian2Value(profile_.joint_ids[i], position.at(i));
   }
