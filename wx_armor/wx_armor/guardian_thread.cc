@@ -160,6 +160,7 @@ void GuardianThread::ResetErrorCodes() {
         error_code = 0;
     }
     Driver()->ResetSafetyViolationMode();
+    Driver()->ResetGripperClosingCounter();
 }
 
 void GuardianThread::SetErrorCode(uint8_t motor_idx, int32_t error_code, bool is_joint_idx) {
