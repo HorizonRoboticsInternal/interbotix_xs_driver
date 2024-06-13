@@ -117,9 +117,7 @@ struct PIDGain {
  * @code
  *   WxArmorDriver driver("/dev/ttyUSB0", "path/to/motor_config.yaml");
  *   driver.TorqueOn();
- *   driver.SetPosition({1.0, 1.5, 1.2});
- *   driver.FetchSensorData();
- *   auto sensorJson = driver.SensorDataToJson();
+ *   driver.SendCommand({1.0, 1.5, 1.2});
  * @endcode
  *
  * @note This driver is specific to robots with Dynamixel motors and requires
@@ -141,7 +139,8 @@ class WxArmorDriver {
   WxArmorDriver(const std::string &usb_port,
                 std::filesystem::path motor_config_path,
                 bool flash_eeprom = false,
-                int32_t current_limit = 250);
+                int32_t current_limit = 250,
+                bool gripper_use_pwm_control = false);
 
   ~WxArmorDriver();
 
@@ -164,15 +163,16 @@ class WxArmorDriver {
   std::vector<float> GetSafetyVelocityLimits();
 
   /**
-   * @brief Sets the position of the robot's joints, with a desired moving and
-   * acceleration time.
+   * @brief Send command to each of the motors.
    * @details If acc_time is zero, constant velocity is used.
-   * @param position A vector of floats representing the desired joint
-   * positions.
-   * @param moving_time A float in seconds
-   * @param acc_time A float in seconds
+   * @param targets A vector of floats representing the desired joint
+   *        commands, one for each of the joints. Note that the meaning of the
+   *        joint command depends on its operating mode (i.e. position control,
+   *        pwm control, etc).
+   * @param moving_time A float in seconds (only for position control joints)
+   * @param acc_time A float in seconds (only for position control joints)
    */
-  void SetPosition(const std::vector<float> &position,
+  void SendCommand(const std::vector<float> &targets,
                    float moving_time,
                    float acc_time = 0.0);
 
@@ -228,6 +228,15 @@ class WxArmorDriver {
    *       "wrist", "p": 400, "i": 0, "d": 0}]
    */
   void SetPID(const std::vector<PIDGain> &gain_cfgs);
+
+  /**
+   * @brief Switch the gripper motor from position control to PWM control.
+   *
+   * The gripper is usually powered by the XL430-W250 motor, which does not
+   * offer true current (torque) control. The PWM control mode is the closest
+   * mode we can use to mimic the torque control.
+   */
+  void UsePWMControlOnGripper();
 
   /**
    * @brief Returns the current safety violation mode status.
@@ -298,18 +307,13 @@ class WxArmorDriver {
   // │ Write            │
   // └──────────────────┘
 
-  // Unlike write, in the future we may have write handler for each of the
-  // operation mode (e.g. position control, velocity control, pwm control).
-  // Therefore we will need to store handler index for each of them.
-  uint8_t write_position_handler_index_;
+  // Index to the write handler that is used to write the control signals to the
+  // driver. Since we have only one writer at this moment, so the index is
+  // exepcted to be 0.
+  uint8_t write_handler_index_;
 
-  // Similar to how we read, we also write to identical addresses on each
-  // motor.
-  ControlItem write_position_address_;
-
-  // Index to the write handler that writes both the position and velocity and
-  // acceleration profile, and the corresponding register addresses.
-  uint8_t write_position_and_profile_handler_index_;
+  // The range of addresses on each motor to write to for each of the command.
+  ControlItem write_address_;
 
   // Flag that gets triggered when safety violations such as
   // velocity limits are violated.

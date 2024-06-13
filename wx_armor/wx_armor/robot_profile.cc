@@ -17,13 +17,12 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(
     float safety_vel_limit = info["Safety_Velocity_Limit"].as<float>();
     safety_vel_limit *= M_PI / 180.;
 
-    profile.motors.emplace_back(MotorInfo{
-        .id = motor_id,
-        .name = child.first.as<std::string>(),
-        // By default, set the operation mode to position control.
-        .op_mode = OpMode::POSITION,
-        .safety_vel_limit = safety_vel_limit
-    });
+    profile.motors.emplace_back(
+        MotorInfo{.id = motor_id,
+                  .name = child.first.as<std::string>(),
+                  // By default, set the operation mode to position control.
+                  .op_mode = OpMode::POSITION,
+                  .safety_vel_limit = safety_vel_limit});
 
     // Now, populate the register table.
     for (const auto &kv : info) {
@@ -46,6 +45,7 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(
           name);
     }
     profile.joint_ids.emplace_back(motor->id);
+    profile.joint_motors.emplace_back(motor);
     profile.joint_names.emplace_back(motor->name);
   }
 
@@ -101,8 +101,6 @@ std::string_view OpModeName(OpMode mode) {
       return "CURRENT_BASED_POSITION";
     case OpMode::PWM:
       return "PWM";
-    case OpMode::TORQUE:
-      return "TORQUE";
   }
   return "UNKNOWN";
 }

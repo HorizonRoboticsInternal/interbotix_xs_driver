@@ -25,11 +25,12 @@
 #pragma once
 
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <map>
 #include <string_view>
 #include <vector>
-#include <math.h>
 
 #include "yaml-cpp/yaml.h"
 
@@ -44,7 +45,6 @@ enum class OpMode : int {
   POSITION = 3,                // Position controller
   CURRENT_BASED_POSITION = 5,  // Current based position controller
   PWM = 16,                    // Pulse-width modulation controller
-  TORQUE = 100,                // Torque controller
 };
 
 // Convert the OpMode enum to a string e.g. for debugging purpose.
@@ -98,6 +98,9 @@ struct RegistryKV {
 struct RobotProfile {
   std::vector<MotorInfo> motors{};
   std::vector<uint8_t> joint_ids{};
+  // Use this to access the corresponding motor of each joint, in the
+  // same order as `joint_ids`.
+  std::vector<const MotorInfo *> joint_motors{};
   std::vector<std::string> joint_names{};
   std::vector<RegistryKV> eeprom{};
 
@@ -114,6 +117,19 @@ struct RobotProfile {
       }
     }
     return nullptr;
+  }
+
+  // Returns true if the motor with desired name is found and the
+  // callback is invoked on it. Returns false otherwise.
+  inline bool UpdateMotorByName(
+      const std::string name, std::function<void(MotorInfo *motor)> callback) {
+    for (MotorInfo &motor : motors) {
+      if (motor.name == name) {
+        callback(&motor);
+        return true;
+      }
+    }
+    return false;
   }
 };
 
