@@ -448,8 +448,26 @@ void WxArmorDriver::SetPosition(const std::vector<float> &position,
   int32_t acc_time_ms = static_cast<int32_t>(acc_time * 1000.0);
   const uint8_t num_joints = static_cast<uint8_t>(profile_.joint_ids.size());
   std::vector<int32_t> int_command(num_joints * 3, 0);
+  std::optional<SensorData> sensor_data = this->Read();
+  // Publish the sensor data
+  if (!sensor_data.has_value()) {
+    spdlog::error("Failed to read sensor data when setting position.");
+    return;
+  }
   size_t j = 0;
   for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+    // Safety check:
+    float reading = sensor_data.value().pos[i];
+    if (fabs(reading - position.at(i)) >
+        0.2) {  // 0.2 is a generous action delta for pid control
+      spdlog::error(
+          "Joint {} command is out of range: {} -> {} > 0.2. Command ignored.",
+          i,
+          reading,
+          position.at(i));
+      this->TriggerSafetyViolationMode();
+      return;
+    }
     // Profile acceleration
     int_command[j++] = acc_time_ms;
     // Profile velocity
