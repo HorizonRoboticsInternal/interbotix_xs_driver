@@ -71,7 +71,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       for (size_t i = 0; i < json.size(); ++i) {
         position[i] = json.at(i).get<float>();
       }
-      Driver()->SetPosition(position, 0.0);
+      checkAndSetPosition(position, 0.0);
     } else if (Match("MOVETO")) {
       // Update the states for bookkeeping purpose.
       ClientState &state = conn->getContextRef<ClientState>();
@@ -86,7 +86,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
         position[i] = json.at(i).get<float>();
       }
       float moving_time = json.at(json.size() - 1).get<float>();
-      Driver()->SetPosition(position, moving_time);
+      checkAndSetPosition(position, moving_time);
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
@@ -129,6 +129,28 @@ void SlowDownToStop(const SensorData &curr_reading,
 
   // Overwrite the current trajectory with our decelerating one.
   Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
+}
+
+void WxArmorWebController::checkAndSetPosition(const std::vector<float> &cmd,
+                                               float moving_time) {
+  const SensorData &readings = Driver()->GetCachedSensorData();
+  for (int i = 0; i < cmd.size() - 1; i++) {
+    // Ignore last position for the grippers
+    float reading = readings.pos.at(i);
+    if (fabs(reading - cmd[i]) >
+        0.2) {  // 0.2 is a generous action delta for pid control
+      spdlog::error(
+          "Joint {} command is out of range: {} -> {} > 0.2. Command ignored.",
+          i,
+          reading,
+          cmd[i]);
+      Driver()->TriggerSafetyViolationMode();
+      SlowDownToStop(readings);
+      guardian_thread_.KillConnections();
+      return;
+    }
+  }
+  Driver()->SetPosition(cmd, moving_time);
 }
 
 WxArmorWebController::GuardianThread::GuardianThread() {
@@ -222,7 +244,7 @@ void WxArmorWebController::GuardianThread::KillConnections() {
   for (auto &conn : conns_) {
     // TODO(andrew): log which joint was responsible?
     conn->shutdown(drogon::CloseCode::kViolation,
-                   "Shutting down due to velocity limit violation.");
+                   "Shutting down due to safety violation.");
   }
   conns_.clear();
 }

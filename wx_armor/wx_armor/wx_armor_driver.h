@@ -253,6 +253,13 @@ class WxArmorDriver {
    */
   void ResetSafetyViolationMode();
 
+  /**
+   * @brief Returns the sensor data cached from the latest read.
+   *
+   * @return A copy of the sensor data.
+  */
+  const SensorData GetCachedSensorData();
+
  private:
   ControlItem AddItemToRead(const std::string &name);
 
@@ -314,6 +321,9 @@ class WxArmorDriver {
   // Flag that gets triggered when safety violations such as
   // velocity limits are violated.
   std::atomic_bool safety_violation_{false};
+
+  SensorData sensor_data_cache_;
+  std::mutex cache_mutex_;  // protects read/write access to sensor_data_cache.
 };
 
 }  // namespace horizon::wx_armor

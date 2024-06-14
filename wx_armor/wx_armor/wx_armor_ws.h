@@ -47,6 +47,8 @@ class WxArmorWebController
       const drogon::HttpRequestPtr &,
       const drogon::WebSocketConnectionPtr &) override;
 
+  void checkAndSetPosition(const std::vector<float> &cmd, float moving_time);
+
   // Listens on the `"/api/engage"` path for websocket connection.
   WS_PATH_LIST_BEGIN
   WS_PATH_ADD("/api/engage", drogon::Get);
@@ -69,15 +71,15 @@ class WxArmorWebController
     // list.
     void Unsubscribe(const drogon::WebSocketConnectionPtr &conn);
 
+    // Close and remove all client connections from subscription list
+    void KillConnections();
+
    private:
     std::mutex conns_mutex_;  // protects conns_
     std::vector<drogon::WebSocketConnectionPtr> conns_{};
 
     std::atomic_bool shutdown_{false};
     std::jthread thread_{};
-
-    // Close and remove all client connections from subscription list
-    void KillConnections();
 
     // Book keeping of the number of read errors in a row. Reset to 0 as soon as
     // a successful read is seen. Server will crash as soon as this number
