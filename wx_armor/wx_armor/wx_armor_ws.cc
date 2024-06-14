@@ -137,13 +137,17 @@ void WxArmorWebController::checkAndSetPosition(const std::vector<float> &cmd,
   for (int i = 0; i < cmd.size() - 1; i++) {
     // Ignore last position for the grippers
     float reading = readings.pos.at(i);
-    if (fabs(reading - cmd[i]) >
-        0.2) {  // 0.2 is a generous action delta for pid control
+    // 0.2 is a generous action delta for pid control
+    float thd = 0.2;
+    if (moving_time > 0.1)
+      thd = 2.5 * moving_time;
+    if (fabs(reading - cmd[i]) > thd) {
       spdlog::error(
-          "Joint {} command is out of range: {} -> {} > 0.2. Command ignored.",
+          "Joint {} command is out of range: {} -> {} > {}. Command ignored.",
           i,
           reading,
-          cmd[i]);
+          cmd[i],
+          thd);
       Driver()->TriggerSafetyViolationMode();
       SlowDownToStop(readings);
       guardian_thread_.KillConnections();
@@ -157,6 +161,7 @@ WxArmorWebController::GuardianThread::GuardianThread() {
   thread_ = std::jthread([this]() {
     std::vector<float> safety_velocity_limits =
         Driver()->GetSafetyVelocityLimits();
+    int logged = 0;
     while (!shutdown_.load()) {
       // Read the sensor data
       std::optional<SensorData> sensor_data = Driver()->Read();
@@ -172,9 +177,11 @@ WxArmorWebController::GuardianThread::GuardianThread() {
 
         // Don't check for a new safety violation if state hasn't been reset yet
         if (Driver()->SafetyViolationTriggered()) {
-          spdlog::error(
-              "Guardian thread safety violation checking ignored. Safety "
-              "violation is already triggered.");
+          if (logged < 1)
+            spdlog::error(
+                "Guardian thread safety violation checking ignored. Safety "
+                "violation is already triggered.");
+            logged++;
           continue;
         }
 
