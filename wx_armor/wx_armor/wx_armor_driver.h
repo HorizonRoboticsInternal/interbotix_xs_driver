@@ -112,6 +112,10 @@ struct PIDGain {
  * sensor data, setting joint positions, and enabling/disabling motor torque.
  * The driver communicates with the motors through a specified USB port and
  * follows configurations defined in a motor configuration file.
+ * 
+ * @note The WxArmorDriver should never be used by applications directly, as it does not
+ * provide any safety protections.
+ * Instead, it should only be invoked through the WxArmorWebController class as of now.
  *
  * Usage:
  * @code

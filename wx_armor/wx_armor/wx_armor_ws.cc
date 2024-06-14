@@ -71,7 +71,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       for (size_t i = 0; i < json.size(); ++i) {
         position[i] = json.at(i).get<float>();
       }
-      Driver()->SetPosition(position, 0.0);
+      CheckAndSetPosition(position, 0.0);
     } else if (Match("MOVETO")) {
       // Update the states for bookkeeping purpose.
       ClientState &state = conn->getContextRef<ClientState>();
@@ -86,7 +86,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
         position[i] = json.at(i).get<float>();
       }
       float moving_time = json.at(json.size() - 1).get<float>();
-      Driver()->SetPosition(position, moving_time);
+      CheckAndSetPosition(position, moving_time);
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
@@ -131,16 +131,49 @@ void SlowDownToStop(const SensorData &curr_reading,
   Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
 }
 
+void WxArmorWebController::CheckAndSetPosition(const std::vector<float> &cmd,
+                                               float moving_time) {
+  const SensorData readings = guardian_thread_.GetCachedSensorData();
+  for (int i = 0; i + 1 < cmd.size(); i++) {
+    // Ignore last position for the grippers
+    float reading = readings.pos.at(i);
+    // 0.2 is a generous action delta for pid control
+    float thd = 0.2;
+    if (moving_time > 0.1)
+      thd = 2.5 * moving_time;
+    if (fabs(reading - cmd[i]) > thd) {
+      spdlog::error(
+          "Joint {} command is out of range: {} -> {} > {}. Command ignored.",
+          i,
+          reading,
+          cmd[i],
+          thd);
+      Driver()->TriggerSafetyViolationMode();
+      SlowDownToStop(readings);
+      guardian_thread_.KillConnections();
+      return;
+    }
+  }
+  Driver()->SetPosition(cmd, moving_time);
+}
+
 WxArmorWebController::GuardianThread::GuardianThread() {
   thread_ = std::jthread([this]() {
     std::vector<float> safety_velocity_limits =
         Driver()->GetSafetyVelocityLimits();
+    bool logged = false;
     while (!shutdown_.load()) {
       // Read the sensor data
       std::optional<SensorData> sensor_data = Driver()->Read();
 
       // Publish the sensor data
       if (sensor_data.has_value()) {
+        {
+          std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+          sensor_data_cache_ = SensorData{.pos = sensor_data.value().pos,
+                                          .vel = sensor_data.value().vel,
+                                          .crt = sensor_data.value().crt};
+        }
         num_consecutive_read_errors_ = 0;
         std::string message = nlohmann::json(sensor_data.value()).dump();
         std::lock_guard<std::mutex> lock{conns_mutex_};
@@ -150,9 +183,11 @@ WxArmorWebController::GuardianThread::GuardianThread() {
 
         // Don't check for a new safety violation if state hasn't been reset yet
         if (Driver()->SafetyViolationTriggered()) {
-          spdlog::error(
-              "Guardian thread safety violation checking ignored. Safety "
-              "violation is already triggered.");
+          if (!logged)
+            spdlog::error(
+                "Guardian thread safety violation checking ignored. Safety "
+                "violation is already triggered.");
+            logged = true;
           continue;
         }
 
@@ -195,6 +230,11 @@ WxArmorWebController::GuardianThread::GuardianThread() {
   });
 }
 
+const SensorData WxArmorWebController::GuardianThread::GetCachedSensorData() {
+  std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+  return sensor_data_cache_;
+}
+
 WxArmorWebController::GuardianThread::~GuardianThread() {
   shutdown_.store(true);
   if (thread_.joinable()) {
@@ -222,7 +262,7 @@ void WxArmorWebController::GuardianThread::KillConnections() {
   for (auto &conn : conns_) {
     // TODO(andrew): log which joint was responsible?
     conn->shutdown(drogon::CloseCode::kViolation,
-                   "Shutting down due to velocity limit violation.");
+                   "Shutting down due to safety violation.");
   }
   conns_.clear();
 }
