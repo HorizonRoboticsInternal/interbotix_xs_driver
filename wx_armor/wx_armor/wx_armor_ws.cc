@@ -71,7 +71,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
       for (size_t i = 0; i < json.size(); ++i) {
         position[i] = json.at(i).get<float>();
       }
-      checkAndSetPosition(position, 0.0);
+      CheckAndSetPosition(position, 0.0);
     } else if (Match("MOVETO")) {
       // Update the states for bookkeeping purpose.
       ClientState &state = conn->getContextRef<ClientState>();
@@ -86,7 +86,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
         position[i] = json.at(i).get<float>();
       }
       float moving_time = json.at(json.size() - 1).get<float>();
-      checkAndSetPosition(position, moving_time);
+      CheckAndSetPosition(position, moving_time);
     } else if (Match("TORQUE ON")) {
       Driver()->TorqueOn();
     } else if (Match("TORQUE OFF")) {
@@ -131,10 +131,10 @@ void SlowDownToStop(const SensorData &curr_reading,
   Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
 }
 
-void WxArmorWebController::checkAndSetPosition(const std::vector<float> &cmd,
+void WxArmorWebController::CheckAndSetPosition(const std::vector<float> &cmd,
                                                float moving_time) {
-  const SensorData &readings = Driver()->GetCachedSensorData();
-  for (int i = 0; i < cmd.size() - 1; i++) {
+  const SensorData readings = guardian_thread_.GetCachedSensorData();
+  for (int i = 0; i + 1 < cmd.size(); i++) {
     // Ignore last position for the grippers
     float reading = readings.pos.at(i);
     // 0.2 is a generous action delta for pid control
@@ -161,13 +161,19 @@ WxArmorWebController::GuardianThread::GuardianThread() {
   thread_ = std::jthread([this]() {
     std::vector<float> safety_velocity_limits =
         Driver()->GetSafetyVelocityLimits();
-    int logged = 0;
+    bool logged = false;
     while (!shutdown_.load()) {
       // Read the sensor data
       std::optional<SensorData> sensor_data = Driver()->Read();
 
       // Publish the sensor data
       if (sensor_data.has_value()) {
+        {
+          std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+          sensor_data_cache_ = SensorData{.pos = sensor_data.value().pos,
+                                          .vel = sensor_data.value().vel,
+                                          .crt = sensor_data.value().crt};
+        }
         num_consecutive_read_errors_ = 0;
         std::string message = nlohmann::json(sensor_data.value()).dump();
         std::lock_guard<std::mutex> lock{conns_mutex_};
@@ -177,11 +183,11 @@ WxArmorWebController::GuardianThread::GuardianThread() {
 
         // Don't check for a new safety violation if state hasn't been reset yet
         if (Driver()->SafetyViolationTriggered()) {
-          if (logged < 1)
+          if (!logged)
             spdlog::error(
                 "Guardian thread safety violation checking ignored. Safety "
                 "violation is already triggered.");
-            logged++;
+            logged = true;
           continue;
         }
 
@@ -222,6 +228,14 @@ WxArmorWebController::GuardianThread::GuardianThread() {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   });
+}
+
+const SensorData WxArmorWebController::GuardianThread::GetCachedSensorData() {
+  std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+  SensorData result = SensorData{.pos = sensor_data_cache_.pos,
+                                 .vel = sensor_data_cache_.vel,
+                                 .crt = sensor_data_cache_.crt};
+  return result;
 }
 
 WxArmorWebController::GuardianThread::~GuardianThread() {

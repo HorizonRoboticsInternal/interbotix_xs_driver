@@ -422,20 +422,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
   }
 
   handler_lock.unlock();
-
-  std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-  sensor_data_cache_ = SensorData{.pos = result.pos,
-                                  .vel = result.vel,
-                                  .crt = result.crt};
   return std::move(result);
-}
-
-const SensorData WxArmorDriver::GetCachedSensorData() {
-  std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-  SensorData result = SensorData{.pos = sensor_data_cache_.pos,
-                                 .vel = sensor_data_cache_.vel,
-                                 .crt = sensor_data_cache_.crt};
-  return result;
 }
 
 std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {

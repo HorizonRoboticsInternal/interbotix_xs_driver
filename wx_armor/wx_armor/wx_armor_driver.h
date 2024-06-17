@@ -112,6 +112,10 @@ struct PIDGain {
  * sensor data, setting joint positions, and enabling/disabling motor torque.
  * The driver communicates with the motors through a specified USB port and
  * follows configurations defined in a motor configuration file.
+ * 
+ * @note The WxArmorDriver should never be used by applications directly, as it does not
+ * provide any safety protections.
+ * Instead, it should only be invoked through the WxArmorWebController class as of now.
  *
  * Usage:
  * @code
@@ -253,13 +257,6 @@ class WxArmorDriver {
    */
   void ResetSafetyViolationMode();
 
-  /**
-   * @brief Returns the sensor data cached from the latest read.
-   *
-   * @return A copy of the sensor data.
-  */
-  const SensorData GetCachedSensorData();
-
  private:
   ControlItem AddItemToRead(const std::string &name);
 
@@ -321,9 +318,6 @@ class WxArmorDriver {
   // Flag that gets triggered when safety violations such as
   // velocity limits are violated.
   std::atomic_bool safety_violation_{false};
-
-  SensorData sensor_data_cache_;
-  std::mutex cache_mutex_;  // protects read/write access to sensor_data_cache.
 };
 
 }  // namespace horizon::wx_armor

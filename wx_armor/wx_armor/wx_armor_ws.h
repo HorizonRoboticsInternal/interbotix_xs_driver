@@ -47,7 +47,7 @@ class WxArmorWebController
       const drogon::HttpRequestPtr &,
       const drogon::WebSocketConnectionPtr &) override;
 
-  void checkAndSetPosition(const std::vector<float> &cmd, float moving_time);
+  void CheckAndSetPosition(const std::vector<float> &cmd, float moving_time);
 
   // Listens on the `"/api/engage"` path for websocket connection.
   WS_PATH_LIST_BEGIN
@@ -55,10 +55,27 @@ class WxArmorWebController
   WS_PATH_LIST_END
 
  private:
-  // The GuardianThread is responsible for 1) continuously (by running a background
-  // thread) read the sensor data and publish it to the clients that subscribe
-  // the sensor data and 2) monitoring for safety violations and notifying
-  // WxArmorDriver accordingly to prevent system damage.
+  // The GuardianThread is responsible for 1) continuously (by running a
+  // background thread) read the sensor data and publish it to the clients that
+  // subscribe the sensor data and 2) monitoring for safety violations and
+  // notifying WxArmorDriver accordingly to prevent system damage.
+  //
+  // TODO(hobot):
+  //
+  // Currently the GuardianThread does several things, i.e. the continuous
+  // reading (the thread part), the joint velocity safety check (the guardian
+  // part), and sending the readings to the clients.
+  //
+  // However, there is additional safety checking for action delta in the
+  // WxAarmorWebController.  This is not ideal.
+  //
+  // In the future, the Guardian should be moved to a separate class as a
+  // wrapper for the WxArmorDriver.  It should contain the safety_violation_
+  // related logic in the current WxArmorDriver.
+  //
+  // The WebController should be yet another layer on top of the Guardian class,
+  // to handle sending the readings to the clients (via injecting a callback to
+  // the Guardian's reading thread), and sending actions to the WxArmorDriver.
   class GuardianThread {
    public:
     GuardianThread();
@@ -74,6 +91,13 @@ class WxArmorWebController
     // Close and remove all client connections from subscription list
     void KillConnections();
 
+    /**
+     * @brief Returns the sensor data cached from the latest read.
+     *
+     * @return A copy of the sensor data.
+     */
+    const SensorData GetCachedSensorData();
+
    private:
     std::mutex conns_mutex_;  // protects conns_
     std::vector<drogon::WebSocketConnectionPtr> conns_{};
@@ -85,6 +109,10 @@ class WxArmorWebController
     // a successful read is seen. Server will crash as soon as this number
     // exceeds the threshold.
     int num_consecutive_read_errors_ = 0;
+
+    SensorData sensor_data_cache_;
+    std::mutex
+        cache_mutex_;  // protects read/write access to sensor_data_cache.
   };
 
   GuardianThread guardian_thread_;
