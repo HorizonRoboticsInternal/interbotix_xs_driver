@@ -232,10 +232,7 @@ WxArmorWebController::GuardianThread::GuardianThread() {
 
 const SensorData WxArmorWebController::GuardianThread::GetCachedSensorData() {
   std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-  SensorData result = SensorData{.pos = sensor_data_cache_.pos,
-                                 .vel = sensor_data_cache_.vel,
-                                 .crt = sensor_data_cache_.crt};
-  return result;
+  return sensor_data_cache_;
 }
 
 WxArmorWebController::GuardianThread::~GuardianThread() {

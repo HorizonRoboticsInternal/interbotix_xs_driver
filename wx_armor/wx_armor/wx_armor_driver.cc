@@ -421,7 +421,6 @@ std::optional<SensorData> WxArmorDriver::Read() {
         dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
   }
 
-  handler_lock.unlock();
   return std::move(result);
 }
 
