@@ -17,11 +17,16 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(
     float safety_vel_limit = info["Safety_Velocity_Limit"].as<float>();
     safety_vel_limit *= M_PI / 180.;
 
+    uint32_t current_limit = info["Current_Limit"].as<uint32_t>();
+
+    OpMode op_mode = (current_limit == 0) ? OpMode::POSITION : OpMode::CURRENT_BASED_POSITION;
+
     profile.motors.emplace_back(MotorInfo{
         .id = motor_id,
         .name = child.first.as<std::string>(),
         // By default, set the operation mode to position control.
-        .op_mode = OpMode::POSITION,
+        .op_mode = op_mode,
+        .current_limit = current_limit,
         .safety_vel_limit = safety_vel_limit
     });
 

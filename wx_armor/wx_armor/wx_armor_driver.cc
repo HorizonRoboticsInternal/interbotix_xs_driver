@@ -107,7 +107,7 @@ void FlashEEPROM(DynamixelWorkbench *dxl_wb, const RobotProfile &profile) {
 
     // Hacky fix for now... Probably a better way to handle this
     // Safety_Velocity_Limit is our own custom param. Don't write it to EEPROM
-    if (kv.key == "Safety_Velocity_Limit") {
+    if (kv.key == "Safety_Velocity_Limit" || kv.key == "Current_Limit") {
       continue;
     }
     dxl_wb->itemRead(kv.motor_id, kv.key.c_str(), &current_value);
@@ -219,12 +219,12 @@ void CalibrateShadowOrDie(DynamixelWorkbench *dxl_wb,
 //
 // The WidowX 250s robotic arm has 7 XM-series motors and 2-XL series motors.
 void SetCurrentLimit(DynamixelWorkbench *dxl_wb,
-                     RobotProfile *profile,
-                     int32_t current_limit) {
+                     RobotProfile *profile) {
   const char *log = nullptr;
 
   for (MotorInfo &motor : profile->motors) {
     std::string model_name = dxl_wb->getModelName(motor.id);
+    uint32_t current_limit = motor.current_limit;
 
     // If the current limit (effectively torque limit) is set to a non-zero
     // value, we should use current-based position controller as the operation
@@ -292,8 +292,7 @@ void RebootMotorIfInErrorState(DynamixelWorkbench *dxl_wb,
 
 WxArmorDriver::WxArmorDriver(const std::string &usb_port,
                              fs::path motor_config_path,
-                             bool flash_eeprom,
-                             int32_t current_limit)
+                             bool flash_eeprom)
     : profile_(LoadConfigOrDie(motor_config_path).as<RobotProfile>()) {
   WaitUntilPortAvailable(&dxl_wb_, usb_port);
 
@@ -330,7 +329,7 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
     FlashEEPROM(&dxl_wb_, profile_);
   }
   CalibrateShadowOrDie(&dxl_wb_, profile_);
-  SetCurrentLimit(&dxl_wb_, &profile_, current_limit);
+  SetCurrentLimit(&dxl_wb_, &profile_);
 
   // Now torque back on.
   TorqueOn();
