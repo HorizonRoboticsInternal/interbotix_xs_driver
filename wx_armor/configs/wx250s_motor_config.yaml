@@ -82,7 +82,7 @@ motors:
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 380
+    Safety_Velocity_Limit: 500
 
   shoulder:
     ID: 2
@@ -96,7 +96,7 @@ motors:
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 380
+    Safety_Velocity_Limit: 1000
 
   shoulder_shadow:
     ID: 3
@@ -110,7 +110,7 @@ motors:
     Secondary_ID: 2
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 380
+    Safety_Velocity_Limit: 1000
 
   elbow:
     ID: 4
@@ -124,7 +124,7 @@ motors:
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 380
+    Safety_Velocity_Limit: 1000
 
   elbow_shadow:
     ID: 5
@@ -138,7 +138,7 @@ motors:
     Secondary_ID: 4
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 380
+    Safety_Velocity_Limit: 1000
 
   forearm_roll:
     ID: 6
