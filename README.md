@@ -44,8 +44,8 @@ Building the packages requires the following dependencies:
 #### Building From Source
 
 ```sh
-git clone --recursive https://github.com/Interbotix/interbotix_xs_driver.git -b main
-cd interbotix_xs_driver
+git clone --recursive https://github.com/HorizonRoboticsInternal/interbotix_xs_driver.git -b main
+cd interbotix_xs_driver/wx_armor
 mkdir build
 cd build
 cmake ..
