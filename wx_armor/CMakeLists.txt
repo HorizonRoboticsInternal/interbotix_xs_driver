@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.21)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "Do not build in-source. Please remove CMakeCache.txt and the CMakeFiles/ directory. Then build out-of-source.")
@@ -33,10 +33,6 @@ find_package(Drogon REQUIRED)
 
 add_library(robot_profile STATIC)
 target_sources(robot_profile
-    PUBLIC
-    FILE_SET HEADERS
-    BASE_DIRS wx_armor
-    FILES wx_armor/robot_profile.h
     PRIVATE wx_armor/robot_profile.cc)
 target_link_libraries(robot_profile PUBLIC
     spdlog::spdlog
@@ -44,10 +40,6 @@ target_link_libraries(robot_profile PUBLIC
 
 add_library(wx_armor_driver STATIC)
 target_sources(wx_armor_driver
-    PUBLIC
-    FILE_SET HEADERS
-    BASE_DIRS wx_armor
-    FILES wx_armor/wx_armor_driver.h
     PRIVATE wx_armor/wx_armor_driver.cc)
 target_link_libraries(wx_armor_driver PUBLIC
     robot_profile
@@ -58,10 +50,6 @@ target_link_libraries(wx_armor_driver PUBLIC
 
 add_library(wx_armor_ws STATIC)
 target_sources(wx_armor_ws
-    PUBLIC
-    FILE_SET HEADERS
-    BASE_DIRS wx_armor
-    FILES wx_armor/wx_armor_ws.h
     PRIVATE wx_armor/wx_armor_ws.cc)
 target_link_libraries(wx_armor_ws PUBLIC
     Drogon::Drogon
@@ -78,9 +66,8 @@ target_link_libraries(wx_armor PRIVATE wx_armor_ws)
 
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
-    VERSION ${PROJECT_VERISON}
+    VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion)
-
 
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
@@ -88,10 +75,17 @@ install(FILES
 
 install(
     TARGETS robot_profile wx_armor_driver wx_armor_ws wx_armor
-    EXPORT ${PROJECT_NAME}_Targets
-    FILE_SET HEADERS)
+    EXPORT ${PROJECT_NAME}_Targets)
+
+# Install headers manually
+install(FILES
+    wx_armor/robot_profile.h
+    wx_armor/wx_armor_driver.h
+    wx_armor/wx_armor_ws.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/wx_armor)
 
 install(
     EXPORT ${PROJECT_NAME}_Targets
     NAMESPACE ${PROJECT_NAME}::
     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+
