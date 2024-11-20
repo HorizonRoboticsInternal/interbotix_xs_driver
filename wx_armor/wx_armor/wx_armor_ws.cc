@@ -32,6 +32,7 @@ WxArmorDriver *Driver(bool force_init) {
     int flash_eeprom = true;
     driver = std::make_unique<WxArmorDriver>(
         usb_port, motor_config, static_cast<bool>(flash_eeprom));
+    spdlog::info("WxArmorDriver initialized.")
   }
   return driver.get();
 }
