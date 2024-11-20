@@ -16,7 +16,7 @@
 
 namespace horizon::wx_armor {
 
-WxArmorDriver *Driver();
+WxArmorDriver *Driver(bool force_init = false);
 
 // This is for bookkeeping purpose. We maintain ClientState for each of the
 // client that talks to the server.

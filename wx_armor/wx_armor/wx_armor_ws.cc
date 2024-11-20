@@ -15,8 +15,11 @@ using drogon::WebSocketMessageType;
 
 namespace horizon::wx_armor {
 
-WxArmorDriver *Driver() {
-  static std::unique_ptr<WxArmorDriver> driver = []() {
+WxArmorDriver *Driver(bool force_init) {
+  static std::unique_ptr<WxArmorDriver> driver = nullptr;
+
+  if (force_init || !driver) {
+    // Reinitialize the driver
     std::string usb_port =
         GetEnv<std::string>("WX_ARMOR_USB_PORT", "/dev/ttyDXL");
     std::filesystem::path motor_config = GetEnv<std::filesystem::path>(
@@ -27,9 +30,9 @@ WxArmorDriver *Driver() {
                 .parent_path() /
             "configs" / "wx250s_motor_config.yaml");
     int flash_eeprom = true;
-    return std::make_unique<WxArmorDriver>(
+    driver = std::make_unique<WxArmorDriver>(
         usb_port, motor_config, static_cast<bool>(flash_eeprom));
-  }();
+  }
   return driver.get();
 }
 
@@ -219,9 +222,10 @@ WxArmorWebController::GuardianThread::GuardianThread() {
             MAX_TOLERABLE_CONSECUTIVE_NUM_READ_ERRORS) {
           spdlog::critical(
               "Encounter {} consecutive read errors, which is considered too "
-              "many. Forcefully shutting down.",
+              "many. Sleeping before retry..",
               num_consecutive_read_errors_);
-          std::abort();
+          num_consecutive_read_errors_ = 0;
+          std::this_thread::sleep_for(std::chrono::seconds(3));
         }
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
