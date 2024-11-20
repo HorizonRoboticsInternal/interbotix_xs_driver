@@ -219,9 +219,10 @@ WxArmorWebController::GuardianThread::GuardianThread() {
             MAX_TOLERABLE_CONSECUTIVE_NUM_READ_ERRORS) {
           spdlog::critical(
               "Encounter {} consecutive read errors, which is considered too "
-              "many. Forcefully shutting down.",
+              "many. Sleeping before retry..",
               num_consecutive_read_errors_);
-          std::abort();
+          num_consecutive_read_errors_ = 0;
+          std::this_thread::sleep_for(std::chrono::seconds(3));
         }
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
