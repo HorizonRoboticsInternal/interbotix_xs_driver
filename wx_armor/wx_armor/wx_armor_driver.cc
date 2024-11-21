@@ -312,9 +312,9 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
   // Found DYNAMIXEL Motor ID: 7, Model: XM430-W350, Name: wrist_angle
   // Found DYNAMIXEL Motor ID: 8, Model: XL430-W250, Name: wrist_rotate
   // Found DYNAMIXEL Motor ID: 9, Model: XL430-W250, Name: gripper
-  if (!PingMotors(&dxl_wb_, profile_)) {
+  while (!PingMotors(&dxl_wb_, profile_)) {
     spdlog::critical("Could not find all specified motors.");
-    std::abort();
+    std::this_thread::sleep_for(std::chrono::seconds(3));
   }
 
   // Torque off so that we can write EEPROM, calibrate shadow motors and so on.
