@@ -348,6 +348,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
       .pos = std::vector<float>(num_joints),
       .vel = std::vector<float>(num_joints),
       .crt = std::vector<float>(num_joints),
+      .err = std::vector<uint32_t>(num_joints),
   };
 
   std::unique_lock<std::mutex> handler_lock{io_mutex_};
@@ -435,6 +436,19 @@ std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
     counter++;
   }
   return safety_velocity_limits;
+}
+
+std::vector<float> WxArmorDriver::GetSafetyCurrentLimits() {
+  std::vector<float> safety_current_limits;
+
+  for (const auto &motor : profile_.motors) {
+    float limit = motor.current_limit;
+    if (limit < 1) {
+      limit = 1000;
+    }
+    safety_current_limits.push_back(limit);
+  }
+  return safety_current_limits;
 }
 
 void WxArmorDriver::SetPosition(const std::vector<float> &position,
@@ -558,6 +572,7 @@ void WxArmorDriver::InitReadHandler() {
   read_position_address_ = AddItemToRead("Present_Position");
   read_velocity_address_ = AddItemToRead("Present_Velocity");
   read_current_address_ = AddItemToRead("Present_Current");
+  read_error_address_ = AddItemToRead("Hardware_Error_Status");
 
   read_handler_index_ = dxl_wb_.getTheNumberOfSyncReadHandler();
   if (!dxl_wb_.addSyncReadHandler(read_start_, read_end_ - read_start_)) {

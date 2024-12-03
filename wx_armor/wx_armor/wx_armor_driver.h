@@ -67,6 +67,7 @@ struct SensorData {
   std::vector<float> pos{};  // joint position
   std::vector<float> vel{};  // joint velocity
   std::vector<float> crt{};  // motor electric current of this joint
+  std::vector<uint32_t> err{};  // per joint error codes
 
   // ┌──────────────────┐
   // │ Metadata         │
@@ -77,7 +78,7 @@ struct SensorData {
   // error, it is only expected to be used as a reference.
   int64_t timestamp = 0;
 
-  NLOHMANN_DEFINE_TYPE_INTRUSIVE(SensorData, pos, vel, crt, timestamp);
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(SensorData, pos, vel, crt, err, timestamp);
 };
 
 /**
@@ -161,6 +162,8 @@ class WxArmorDriver {
    *         [rad/s].
    */
   std::vector<float> GetSafetyVelocityLimits();
+
+  std::vector<float> GetSafetyCurrentLimits();
 
   /**
    * @brief Sets the position of the robot's joints, with a desired moving and
@@ -286,6 +289,7 @@ class WxArmorDriver {
   ControlItem read_position_address_;
   ControlItem read_velocity_address_;
   ControlItem read_current_address_;
+  ControlItem read_error_address_;
 
   // Union address interval of the above 3. Note that `read_end_` address is
   // not inclusive (open interval). We need this so that we can issue command

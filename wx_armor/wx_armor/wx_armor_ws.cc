@@ -38,12 +38,6 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
                                             const WebSocketMessageType &type) {
   std::string_view payload{};
 
-  if (Driver()->SafetyViolationTriggered()) {
-    spdlog::error(
-        "Call from message handler ignored. Safety violation was encountered.");
-    return;
-  }
-
   // Valid message should be in the format of "<COMMAND> <PAYLOAD>". This helper
   // function try to match the message with predefined command, and if there is
   // a match, put the payload into `payload`.
@@ -57,43 +51,52 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
     return false;
   };
 
-  if (type == WebSocketMessageType::Text) {
-    if (Match("SETPOS")) {
-      // Update the states for bookkeeping purpose.
-      ClientState &state = conn->getContextRef<ClientState>();
-      state.engaging = true;
-      state.latest_healthy_time = std::chrono::system_clock::now();
+  if (type != WebSocketMessageType::Text) {
+    // This happens during closing connection.
+    // spdlog::error("Received non-text message. Ignored.");
+  } else if (Match("SETPID") && !Driver()->Read().has_value()) {
+    // Allow client to reset error status via SETPID only if driver can read motors
+    spdlog::error("SETPID ignored.  Cannot read");
+  } else if (Driver()->SafetyViolationTriggered()) {
+    spdlog::error(
+      "Call from message handler ignored. Safety violation was encountered.");
+  } else if (Match("SETPOS")) {
+    // Update the states for bookkeeping purpose.
+    ClientState &state = conn->getContextRef<ClientState>();
+    state.engaging = true;
+    state.latest_healthy_time = std::chrono::system_clock::now();
 
-      // Relay the command to the driver.
-      nlohmann::json json = nlohmann::json::parse(payload);
-      std::vector<float> position(json.size());
-      for (size_t i = 0; i < json.size(); ++i) {
-        position[i] = json.at(i).get<float>();
-      }
-      CheckAndSetPosition(position, 0.0);
-    } else if (Match("MOVETO")) {
-      // Update the states for bookkeeping purpose.
-      ClientState &state = conn->getContextRef<ClientState>();
-      state.engaging = true;
-      state.latest_healthy_time = std::chrono::system_clock::now();
-
-      // Relay the command to the driver. Note that the last numbers
-      // in the list is the moving time, in seconds.
-      nlohmann::json json = nlohmann::json::parse(payload);
-      std::vector<float> position(json.size() - 1);
-      for (size_t i = 0; i < json.size() - 1; ++i) {
-        position[i] = json.at(i).get<float>();
-      }
-      float moving_time = json.at(json.size() - 1).get<float>();
-      CheckAndSetPosition(position, moving_time);
-    } else if (Match("TORQUE ON")) {
-      Driver()->TorqueOn();
-    } else if (Match("TORQUE OFF")) {
-      Driver()->TorqueOff();
-    } else if (Match("SETPID")) {
-      std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
-      Driver()->SetPID(gain_cfgs);
+    // Relay the command to the driver.
+    nlohmann::json json = nlohmann::json::parse(payload);
+    std::vector<float> position(json.size());
+    for (size_t i = 0; i < json.size(); ++i) {
+      position[i] = json.at(i).get<float>();
     }
+    CheckAndSetPosition(position, 0.0);
+  } else if (Match("MOVETO")) {
+    // Update the states for bookkeeping purpose.
+    ClientState &state = conn->getContextRef<ClientState>();
+    state.engaging = true;
+    state.latest_healthy_time = std::chrono::system_clock::now();
+
+    // Relay the command to the driver. Note that the last numbers
+    // in the list is the moving time, in seconds.
+    nlohmann::json json = nlohmann::json::parse(payload);
+    std::vector<float> position(json.size() - 1);
+    for (size_t i = 0; i < json.size() - 1; ++i) {
+      position[i] = json.at(i).get<float>();
+    }
+    float moving_time = json.at(json.size() - 1).get<float>();
+    CheckAndSetPosition(position, moving_time);
+  } else if (Match("TORQUE ON")) {
+    Driver()->TorqueOn();
+  } else if (Match("TORQUE OFF")) {
+    Driver()->TorqueOff();
+  } else if (Match("SETPID")) {
+    std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
+    Driver()->SetPID(gain_cfgs);
+    Driver()->ResetSafetyViolationMode();
+    guardian_thread_.ResetErrorCodes();
   }
 }
 
@@ -128,6 +131,8 @@ void SlowDownToStop(const SensorData &curr_reading,
 
   // Overwrite the current trajectory with our decelerating one.
   Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
+  // SetPID to a small Kp, large Kd and zero Ki to drop to the groundfrom current pos.
+  Driver()->SetPID({{"all", 10, 0, 10000}});
 }
 
 void WxArmorWebController::CheckAndSetPosition(const std::vector<float> &cmd,
@@ -148,8 +153,9 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float> &cmd,
           cmd[i],
           thd);
       Driver()->TriggerSafetyViolationMode();
+      guardian_thread_.SetErrorCode(i, GuardianThread::kErrorCommandDeltaTooLarge);
       SlowDownToStop(readings);
-      guardian_thread_.KillConnections();
+      // guardian_thread_.KillConnections();
       return;
     }
   }
@@ -160,6 +166,8 @@ WxArmorWebController::GuardianThread::GuardianThread() {
   thread_ = std::jthread([this]() {
     std::vector<float> safety_velocity_limits =
         Driver()->GetSafetyVelocityLimits();
+    std::vector<float> safety_current_limits =
+        Driver()->GetSafetyCurrentLimits();
     bool logged = false;
     while (!shutdown_.load()) {
       // Read the sensor data
@@ -169,15 +177,33 @@ WxArmorWebController::GuardianThread::GuardianThread() {
       if (sensor_data.has_value()) {
         {
           std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+          // merge sensor_data's error codes with the existing ones with bitwise OR
+          error_codes_.resize(sensor_data.value().err.size());
+          for (size_t i = 0; i < sensor_data.value().err.size(); i++) {
+            error_codes_[i] |= sensor_data.value().err[i];
+          }
           sensor_data_cache_ = SensorData{.pos = sensor_data.value().pos,
                                           .vel = sensor_data.value().vel,
-                                          .crt = sensor_data.value().crt};
+                                          .crt = sensor_data.value().crt,
+                                          .err = error_codes_};
         }
         num_consecutive_read_errors_ = 0;
         std::string message = nlohmann::json(sensor_data.value()).dump();
         std::lock_guard<std::mutex> lock{conns_mutex_};
         for (const WebSocketConnectionPtr &conn : conns_) {
           conn->send(message);
+        }
+
+        // if hardware error is detected, trigger safety violation mode
+        if (sensor_data.value().err.size() > 0) {
+          for (const auto &error_code : sensor_data.value().err) {
+            if (error_code != 0) {
+              Driver()->TriggerSafetyViolationMode();
+              spdlog::error(
+                  "Guardian thread detected hardware error.");
+              break;
+            }
+          }
         }
 
         // Don't check for a new safety violation if state hasn't been reset yet
@@ -198,7 +224,22 @@ WxArmorWebController::GuardianThread::GuardianThread() {
           float limit = safety_velocity_limits[i];
           if (cv > limit) {
             Driver()->TriggerSafetyViolationMode();
-            break;
+            // Set error_code_ to 1 for the motor that violated the limit
+            std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+            error_codes_[i] |= kErrorVelocityLimitViolation;
+          }
+        }
+
+        // Check for current limit violations
+        std::vector<float> curr_currents = sensor_data.value().crt;
+        for (int i = 0; i < curr_currents.size(); i++) {
+          float cc = fabs(curr_currents[i]);
+          float limit = safety_current_limits[i];
+          if (cc > limit) {
+            Driver()->TriggerSafetyViolationMode();
+            // Set error_code_ to 1 for the motor that violated the limit
+            std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+            error_codes_[i] |= kErrorCurrentLimitViolation;
           }
         }
 
@@ -208,12 +249,12 @@ WxArmorWebController::GuardianThread::GuardianThread() {
         // will keep running.
         if (Driver()->SafetyViolationTriggered()) {
           SlowDownToStop(sensor_data.value());
-          KillConnections();
+          // KillConnections();  // Do not kill, just notify client
         }
 
       } else {
         // When fail to read, accumulate the counter, check for threshold and
-        // crash if threshold is exceeded.
+        // warn, and keep waiting.
         ++num_consecutive_read_errors_;
         if (num_consecutive_read_errors_ >
             MAX_TOLERABLE_CONSECUTIVE_NUM_READ_ERRORS) {
@@ -233,6 +274,17 @@ WxArmorWebController::GuardianThread::GuardianThread() {
 const SensorData WxArmorWebController::GuardianThread::GetCachedSensorData() {
   std::unique_lock<std::mutex> cache_lock{cache_mutex_};
   return sensor_data_cache_;
+}
+
+void WxArmorWebController::GuardianThread::ResetErrorCodes() {
+  std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+  error_codes_.clear();
+  Driver()->ResetSafetyViolationMode();
+}
+
+void WxArmorWebController::GuardianThread::SetErrorCode(uint8_t motor_id, uint32_t error_code) {
+  std::unique_lock<std::mutex> cache_lock{cache_mutex_};
+  error_codes_[motor_id] |= error_code;
 }
 
 WxArmorWebController::GuardianThread::~GuardianThread() {
