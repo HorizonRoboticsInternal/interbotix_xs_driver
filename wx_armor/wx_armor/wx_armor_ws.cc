@@ -57,7 +57,9 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
   } else if (Match("SETPID") && !Driver()->Read().has_value()) {
     // Allow client to reset error status via SETPID only if driver can read motors
     spdlog::error("SETPID ignored.  Cannot read");
-  } else if (Driver()->SafetyViolationTriggered()) {
+  } else if (Driver()->SafetyViolationTriggered() && !Match("SETPID")) {
+    // If safety violation is triggered, ignore all commands except SETPID
+    // which resets error status
     spdlog::error(
       "Call from message handler ignored. Safety violation was encountered.");
   } else if (Match("SETPOS")) {
@@ -95,7 +97,6 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
   } else if (Match("SETPID")) {
     std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
     Driver()->SetPID(gain_cfgs);
-    Driver()->ResetSafetyViolationMode();
     guardian_thread_.ResetErrorCodes();
   }
 }
@@ -132,7 +133,7 @@ void SlowDownToStop(const SensorData &curr_reading,
   // Overwrite the current trajectory with our decelerating one.
   Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
   // SetPID to a small Kp, large Kd and zero Ki to drop to the groundfrom current pos.
-  Driver()->SetPID({{"all", 10, 0, 10000}});
+  Driver()->SetPID({{"all", 0, 0, 80000}});
 }
 
 void WxArmorWebController::CheckAndSetPosition(const std::vector<float> &cmd,
@@ -174,24 +175,58 @@ WxArmorWebController::GuardianThread::GuardianThread() {
       std::optional<SensorData> sensor_data = Driver()->Read();
 
       // Publish the sensor data
-      if (sensor_data.has_value()) {
-        {
+      if (sensor_data.has_value() || Driver()->SafetyViolationTriggered()) {
+        if (!sensor_data.has_value()) {
+          // If we have an error, we still want to publish the error codes
+          sensor_data = SensorData{.pos = std::vector<float>{},
+                                   .vel = std::vector<float>{},
+                                   .crt = std::vector<float>{},
+                                   .err = error_codes_};
+        } else {
           std::unique_lock<std::mutex> cache_lock{cache_mutex_};
           // merge sensor_data's error codes with the existing ones with bitwise OR
           error_codes_.resize(sensor_data.value().err.size());
           for (size_t i = 0; i < sensor_data.value().err.size(); i++) {
             error_codes_[i] |= sensor_data.value().err[i];
+            if (!logged && sensor_data.value().err[i] != 0) {
+              spdlog::error(
+                  "Guardian thread detected hardware error for motor {}. Error "
+                  "code: {}",
+                  i,
+                  sensor_data.value().err[i]);
+            }
           }
           sensor_data_cache_ = SensorData{.pos = sensor_data.value().pos,
                                           .vel = sensor_data.value().vel,
                                           .crt = sensor_data.value().crt,
                                           .err = error_codes_};
+          sensor_data = sensor_data_cache_;
         }
         num_consecutive_read_errors_ = 0;
         std::string message = nlohmann::json(sensor_data.value()).dump();
         std::lock_guard<std::mutex> lock{conns_mutex_};
         for (const WebSocketConnectionPtr &conn : conns_) {
           conn->send(message);
+        }
+
+        // If a safety violation is triggered, Slow down to a stop.
+        // This way, user will have to reset on client-side, but the server
+        // will keep running.
+        // NOTE: We need to put this check before all the triggers below,
+        // so that one last message containing the error codes will be sent
+        // to the client before we stop the arm here.
+        if (Driver()->SafetyViolationTriggered()) {
+          if (!logged) {
+            spdlog::error(
+                "Guardian thread safety violation checking ignored. Safety "
+                "violation is already triggered.");
+            SlowDownToStop(sensor_data.value());
+            logged = true;
+          }
+          // Don't check for a new safety violation if state hasn't been reset yet
+          continue;
+        } else {
+          logged = false;
         }
 
         // if hardware error is detected, trigger safety violation mode
@@ -206,16 +241,6 @@ WxArmorWebController::GuardianThread::GuardianThread() {
           }
         }
 
-        // Don't check for a new safety violation if state hasn't been reset yet
-        if (Driver()->SafetyViolationTriggered()) {
-          if (!logged)
-            spdlog::error(
-                "Guardian thread safety violation checking ignored. Safety "
-                "violation is already triggered.");
-            logged = true;
-          continue;
-        }
-
         // GuardianThread also has the dual role of monitoring for safety
         // e.g., checking for velocity limit violations
         std::vector<float> curr_velocities = sensor_data.value().vel;
@@ -227,6 +252,12 @@ WxArmorWebController::GuardianThread::GuardianThread() {
             // Set error_code_ to 1 for the motor that violated the limit
             std::unique_lock<std::mutex> cache_lock{cache_mutex_};
             error_codes_[i] |= kErrorVelocityLimitViolation;
+            spdlog::error(
+                "Guardian thread detected velocity limit violation for motor "
+                "{}. Current velocity: {}, Limit: {}",
+                i,
+                cv,
+                limit);
           }
         }
 
@@ -240,18 +271,14 @@ WxArmorWebController::GuardianThread::GuardianThread() {
             // Set error_code_ to 1 for the motor that violated the limit
             std::unique_lock<std::mutex> cache_lock{cache_mutex_};
             error_codes_[i] |= kErrorCurrentLimitViolation;
+            spdlog::error(
+                "Guardian thread detected current limit violation for motor "
+                "{}. Current current: {}, Limit: {}",
+                i,
+                cc,
+                limit);
           }
         }
-
-        // If a safety violation is triggered, first slow down to a stop
-        // and then kill all client connections.
-        // This way, user will have to reset on client-side, but the server
-        // will keep running.
-        if (Driver()->SafetyViolationTriggered()) {
-          SlowDownToStop(sensor_data.value());
-          // KillConnections();  // Do not kill, just notify client
-        }
-
       } else {
         // When fail to read, accumulate the counter, check for threshold and
         // warn, and keep waiting.

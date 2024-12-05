@@ -444,7 +444,7 @@ std::vector<float> WxArmorDriver::GetSafetyCurrentLimits() {
   for (const auto &motor : profile_.motors) {
     float limit = motor.current_limit;
     if (limit < 1) {
-      limit = 1000;
+      limit = 1200;
     }
     safety_current_limits.push_back(limit);
   }
