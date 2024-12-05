@@ -98,6 +98,20 @@ class WxArmorWebController
      */
     const SensorData GetCachedSensorData();
 
+    const static uint32_t kErrorCommandDeltaTooLarge = 1 << 9;
+    const static uint32_t kErrorVelocityLimitViolation = 1 << 10;
+    const static uint32_t kErrorCurrentLimitViolation = 1 << 11;
+
+    /**
+     * @brief Resets the error codes for all motors.
+     */
+    void ResetErrorCodes();
+
+    /**
+     * @brief Sets the error code for a specific motor.
+     */
+    void SetErrorCode(uint8_t motor_id, uint32_t error_code);
+
    private:
     std::mutex conns_mutex_;  // protects conns_
     std::vector<drogon::WebSocketConnectionPtr> conns_{};
@@ -113,6 +127,13 @@ class WxArmorWebController
     SensorData sensor_data_cache_;
     std::mutex
         cache_mutex_;  // protects read/write access to sensor_data_cache.
+
+    // Error codes for all motors, protected by cache_mutex_.
+    // lower 8 bits are for dynamixel errors,
+    // bit 9 is for command delta too large,
+    // bit 10 is joint velocity limit violation,
+    // bit 11 is joint over current limit violation,
+    std::vector<uint32_t> error_codes_{};
   };
 
   GuardianThread guardian_thread_;
