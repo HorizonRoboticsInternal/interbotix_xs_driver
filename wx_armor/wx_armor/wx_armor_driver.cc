@@ -57,6 +57,7 @@ void WaitUntilPortAvailable(DynamixelWorkbench *dxl_wb,
 // reachable. Returns `false` if not all of them are reachable.
 auto PingMotors(DynamixelWorkbench *dxl_wb,
                 const RobotProfile &profile,
+                bool log_errors_only = false,
                 int num_trials = 3,
                 std::chrono::milliseconds sleep_between_trials =
                     std::chrono::milliseconds(200)) -> bool {
@@ -69,6 +70,9 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
       if (success.count(motor.id) > 0) continue;
       if (dxl_wb->ping(motor.id, &log)) {
         success.emplace(motor.id);
+        if (log_errors_only) {
+          continue;
+        }
         std::string model_name = dxl_wb->getModelName(motor.id);
         spdlog::info("Found DYNAMIXEL Motor ID: {}, Model: {}, Name: {}",
                      motor.id,
@@ -88,10 +92,12 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
     if (success.size() == profile.motors.size()) {
       return true;
     } else if (i + 1 < num_trials) {
-      spdlog::warn("Found only {} / {} motors. Will wait for {} ms and retry.",
-                   success.size(),
-                   profile.motors.size(),
-                   sleep_between_trials.count());
+      if (!log_errors_only) {
+        spdlog::warn("Found only {} / {} motors. Will wait for {} ms and retry.",
+                     success.size(),
+                     profile.motors.size(),
+                     sleep_between_trials.count());
+      }
       std::this_thread::sleep_for(sleep_between_trials);
     }
   }
@@ -339,6 +345,12 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
 }
 
 WxArmorDriver::~WxArmorDriver() {}
+
+bool WxArmorDriver::MotorHealthCheck() {
+  std::unique_lock<std::mutex> handler_lock{io_mutex_};
+  return PingMotors(&dxl_wb_, profile_, /* log_errors_only */ true,
+                    /* num_trials */ 1);
+}
 
 std::optional<SensorData> WxArmorDriver::Read() {
   std::vector<int32_t> buffer(profile_.joint_ids.size());

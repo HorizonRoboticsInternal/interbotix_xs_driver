@@ -156,6 +156,13 @@ class WxArmorDriver {
   std::optional<SensorData> Read();
 
   /**
+   * @brief Check that all motors are health.
+   *
+   * @return Returns true if all motors are reachable and false otherwise.
+   */
+  bool MotorHealthCheck();
+
+  /**
    * @brief Reads the safety velocity limits from RobotProfile and returns it.
    *
    * @return An array containing the safety velocity limits for each motor

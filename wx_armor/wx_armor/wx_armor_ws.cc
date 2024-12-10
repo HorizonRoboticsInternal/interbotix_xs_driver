@@ -52,14 +52,15 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr &conn,
   };
 
   if (type != WebSocketMessageType::Text) {
-    // This happens during closing connection.
-    // spdlog::error("Received non-text message. Ignored.");
+    // This happens during keepalive or closing connection, ignored
   } else if (Match("SETPID") && !Driver()->Read().has_value()) {
     // Allow client to reset error status via SETPID only if driver can read motors
     spdlog::error("SETPID ignored.  Cannot read");
-  } else if (Driver()->SafetyViolationTriggered() && !Match("SETPID")) {
+  } else if (Driver()->SafetyViolationTriggered() && !Match("SETPID") &&
+             !Match("MOVETO")) {
     // If safety violation is triggered, ignore all commands except SETPID
-    // which resets error status
+    // which resets error status, and MOVETO which allows the client to set
+    // the jointpos command to the current position to avoid jumps after SETPID.
     spdlog::error(
       "Call from message handler ignored. Safety violation was encountered.");
   } else if (Match("SETPOS")) {
@@ -161,6 +162,12 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float> &cmd,
     }
   }
   Driver()->SetPosition(cmd, moving_time);
+  if (!Driver()->MotorHealthCheck()) {
+    Driver()->TriggerSafetyViolationMode();
+    guardian_thread_.SetErrorCode(0, GuardianThread::kErrorMotorNotReachable);
+    SlowDownToStop(readings);
+    return;
+  }
 }
 
 WxArmorWebController::GuardianThread::GuardianThread() {
@@ -187,6 +194,7 @@ WxArmorWebController::GuardianThread::GuardianThread() {
           // merge sensor_data's error codes with the existing ones with bitwise OR
           error_codes_.resize(sensor_data.value().err.size());
           for (size_t i = 0; i < sensor_data.value().err.size(); i++) {
+            // Do not call SetErrorCode() here, due to deadlocking of cache_mutex_
             error_codes_[i] |= sensor_data.value().err[i];
             if (!logged && sensor_data.value().err[i] != 0) {
               spdlog::error(
@@ -201,8 +209,8 @@ WxArmorWebController::GuardianThread::GuardianThread() {
                                           .crt = sensor_data.value().crt,
                                           .err = error_codes_};
           sensor_data = sensor_data_cache_;
+          num_consecutive_read_errors_ = 0;
         }
-        num_consecutive_read_errors_ = 0;
         std::string message = nlohmann::json(sensor_data.value()).dump();
         std::lock_guard<std::mutex> lock{conns_mutex_};
         for (const WebSocketConnectionPtr &conn : conns_) {
@@ -223,8 +231,6 @@ WxArmorWebController::GuardianThread::GuardianThread() {
             SlowDownToStop(sensor_data.value());
             logged = true;
           }
-          // Don't check for a new safety violation if state hasn't been reset yet
-          continue;
         } else {
           logged = false;
         }
@@ -234,8 +240,6 @@ WxArmorWebController::GuardianThread::GuardianThread() {
           for (const auto &error_code : sensor_data.value().err) {
             if (error_code != 0) {
               Driver()->TriggerSafetyViolationMode();
-              spdlog::error(
-                  "Guardian thread detected hardware error.");
               break;
             }
           }
@@ -249,10 +253,8 @@ WxArmorWebController::GuardianThread::GuardianThread() {
           float limit = safety_velocity_limits[i];
           if (cv > limit) {
             Driver()->TriggerSafetyViolationMode();
-            // Set error_code_ to 1 for the motor that violated the limit
-            std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-            error_codes_[i] |= kErrorVelocityLimitViolation;
-            spdlog::error(
+            SetErrorCode(i, kErrorVelocityLimitViolation);
+            if (!logged) spdlog::error(
                 "Guardian thread detected velocity limit violation for motor "
                 "{}. Current velocity: {}, Limit: {}",
                 i,
@@ -269,9 +271,8 @@ WxArmorWebController::GuardianThread::GuardianThread() {
           if (cc > limit) {
             Driver()->TriggerSafetyViolationMode();
             // Set error_code_ to 1 for the motor that violated the limit
-            std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-            error_codes_[i] |= kErrorCurrentLimitViolation;
-            spdlog::error(
+            SetErrorCode(i, kErrorCurrentLimitViolation);
+            if (!logged) spdlog::error(
                 "Guardian thread detected current limit violation for motor "
                 "{}. Current current: {}, Limit: {}",
                 i,
@@ -282,13 +283,17 @@ WxArmorWebController::GuardianThread::GuardianThread() {
       } else {
         // When fail to read, accumulate the counter, check for threshold and
         // warn, and keep waiting.
+        // NOTE: no need to trigger a power cycle here, given CheckAndSetPosition
+        // already does a motor health check.
         ++num_consecutive_read_errors_;
         if (num_consecutive_read_errors_ >
             MAX_TOLERABLE_CONSECUTIVE_NUM_READ_ERRORS) {
-          spdlog::critical(
+          if (!logged) spdlog::critical(
               "Encounter {} consecutive read errors, which is considered too "
               "many. Sleeping before retry..",
               num_consecutive_read_errors_);
+          Driver()->TriggerSafetyViolationMode();
+          SetErrorCode(0, kErrorMotorNotReachable);
           num_consecutive_read_errors_ = 0;
           std::this_thread::sleep_for(std::chrono::seconds(3));
         }

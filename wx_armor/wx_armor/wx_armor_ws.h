@@ -101,6 +101,7 @@ class WxArmorWebController
     const static uint32_t kErrorCommandDeltaTooLarge = 1 << 9;
     const static uint32_t kErrorVelocityLimitViolation = 1 << 10;
     const static uint32_t kErrorCurrentLimitViolation = 1 << 11;
+    const static uint32_t kErrorMotorNotReachable = 1 << 12;
 
     /**
      * @brief Resets the error codes for all motors.
