@@ -133,7 +133,7 @@ void SlowDownToStop(const SensorData &curr_reading,
 
   // Overwrite the current trajectory with our decelerating one.
   Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
-  // SetPID to a small Kp, large Kd and zero Ki to drop to the groundfrom current pos.
+  // SetPID to zero Kp, large Kd and zero Ki to drop to the ground from current pos.
   Driver()->SetPID({{"all", 0, 0, 80000}});
 }
 
@@ -310,7 +310,9 @@ const SensorData WxArmorWebController::GuardianThread::GetCachedSensorData() {
 
 void WxArmorWebController::GuardianThread::ResetErrorCodes() {
   std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-  error_codes_.clear();
+  for (uint32_t &error_code : error_codes_) {
+    error_code = 0;
+  }
   Driver()->ResetSafetyViolationMode();
 }
 
