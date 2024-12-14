@@ -147,7 +147,7 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float> &cmd,
     float thd = 0.2;
     if (moving_time > 0.1)
       thd = 2.5 * moving_time;
-    if (fabs(reading - cmd[i]) > thd) {
+    if (!Driver()->SafetyViolationTriggered() && fabs(reading - cmd[i]) > thd) {
       spdlog::error(
           "Joint {} command is out of range: {} -> {} > {}. Command ignored.",
           i,
@@ -162,7 +162,7 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float> &cmd,
     }
   }
   Driver()->SetPosition(cmd, moving_time);
-  if (!Driver()->MotorHealthCheck()) {
+  if (!Driver()->SafetyViolationTriggered() && !Driver()->MotorHealthCheck()) {
     Driver()->TriggerSafetyViolationMode();
     guardian_thread_.SetErrorCode(0, GuardianThread::kErrorMotorNotReachable);
     SlowDownToStop(readings);
@@ -185,9 +185,9 @@ WxArmorWebController::GuardianThread::GuardianThread() {
       if (sensor_data.has_value() || Driver()->SafetyViolationTriggered()) {
         if (!sensor_data.has_value()) {
           // If we have an error, we still want to publish the error codes
-          sensor_data = SensorData{.pos = std::vector<float>{},
-                                   .vel = std::vector<float>{},
-                                   .crt = std::vector<float>{},
+          sensor_data = SensorData{.pos = std::vector<float>{0,0,0,0,0,0,0},
+                                   .vel = std::vector<float>{0,0,0,0,0,0,0},
+                                   .crt = std::vector<float>{0,0,0,0,0,0,0},
                                    .err = error_codes_};
         } else {
           std::unique_lock<std::mutex> cache_lock{cache_mutex_};
@@ -280,7 +280,7 @@ WxArmorWebController::GuardianThread::GuardianThread() {
                 limit);
           }
         }
-      } else {
+      } else if (!Driver()->SafetyViolationTriggered()) {
         // When fail to read, accumulate the counter, check for threshold and
         // warn, and keep waiting.
         // NOTE: no need to trigger a power cycle here, given CheckAndSetPosition
