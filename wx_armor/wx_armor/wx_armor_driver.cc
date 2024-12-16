@@ -353,6 +353,7 @@ bool WxArmorDriver::MotorHealthCheck() {
 }
 
 std::optional<SensorData> WxArmorDriver::Read() {
+  static uint64_t error_count = 0;
   std::vector<int32_t> buffer(profile_.joint_ids.size());
   const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
 
@@ -368,8 +369,13 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
   if (!dxl_wb_.syncRead(
           read_handler_index_, profile_.joint_ids.data(), num_joints, &log)) {
-    spdlog::warn("Failed to syncRead: {}", log);
+    if (error_count % 1000 == 0) {
+      spdlog::warn("Failed to syncRead: {}", log);
+    }
+    ++error_count;
     return std::nullopt;
+  } else {
+    error_count = 0;
   }
 
   // We use the time here as the timestamp for the latest reading. This is,
