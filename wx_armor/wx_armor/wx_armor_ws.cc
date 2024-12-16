@@ -188,7 +188,8 @@ WxArmorWebController::GuardianThread::GuardianThread() {
           sensor_data = SensorData{.pos = std::vector<float>{0,0,0,0,0,0,0},
                                    .vel = std::vector<float>{0,0,0,0,0,0,0},
                                    .crt = std::vector<float>{0,0,0,0,0,0,0},
-                                   .err = error_codes_};
+                                   .err = error_codes_,
+                                   .timestamp = -1};
         } else {
           std::unique_lock<std::mutex> cache_lock{cache_mutex_};
           // merge sensor_data's error codes with the existing ones with bitwise OR
