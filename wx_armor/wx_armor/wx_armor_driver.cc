@@ -57,6 +57,7 @@ void WaitUntilPortAvailable(DynamixelWorkbench *dxl_wb,
 // reachable. Returns `false` if not all of them are reachable.
 auto PingMotors(DynamixelWorkbench *dxl_wb,
                 const RobotProfile &profile,
+                bool log_errors_only = false,
                 int num_trials = 3,
                 std::chrono::milliseconds sleep_between_trials =
                     std::chrono::milliseconds(200)) -> bool {
@@ -69,6 +70,9 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
       if (success.count(motor.id) > 0) continue;
       if (dxl_wb->ping(motor.id, &log)) {
         success.emplace(motor.id);
+        if (log_errors_only) {
+          continue;
+        }
         std::string model_name = dxl_wb->getModelName(motor.id);
         spdlog::info("Found DYNAMIXEL Motor ID: {}, Model: {}, Name: {}",
                      motor.id,
@@ -88,10 +92,12 @@ auto PingMotors(DynamixelWorkbench *dxl_wb,
     if (success.size() == profile.motors.size()) {
       return true;
     } else if (i + 1 < num_trials) {
-      spdlog::warn("Found only {} / {} motors. Will wait for {} ms and retry.",
-                   success.size(),
-                   profile.motors.size(),
-                   sleep_between_trials.count());
+      if (!log_errors_only) {
+        spdlog::warn("Found only {} / {} motors. Will wait for {} ms and retry.",
+                     success.size(),
+                     profile.motors.size(),
+                     sleep_between_trials.count());
+      }
       std::this_thread::sleep_for(sleep_between_trials);
     }
   }
@@ -340,7 +346,14 @@ WxArmorDriver::WxArmorDriver(const std::string &usb_port,
 
 WxArmorDriver::~WxArmorDriver() {}
 
+bool WxArmorDriver::MotorHealthCheck() {
+  std::unique_lock<std::mutex> handler_lock{io_mutex_};
+  return PingMotors(&dxl_wb_, profile_, /* log_errors_only */ true,
+                    /* num_trials */ 1);
+}
+
 std::optional<SensorData> WxArmorDriver::Read() {
+  static uint64_t error_count = 0;
   std::vector<int32_t> buffer(profile_.joint_ids.size());
   const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
 
@@ -348,6 +361,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
       .pos = std::vector<float>(num_joints),
       .vel = std::vector<float>(num_joints),
       .crt = std::vector<float>(num_joints),
+      .err = std::vector<uint32_t>(num_joints),
   };
 
   std::unique_lock<std::mutex> handler_lock{io_mutex_};
@@ -355,8 +369,13 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
   if (!dxl_wb_.syncRead(
           read_handler_index_, profile_.joint_ids.data(), num_joints, &log)) {
-    spdlog::warn("Failed to syncRead: {}", log);
+    if (error_count % 1000 == 0) {
+      spdlog::warn("Failed to syncRead: {}", log);
+    }
+    ++error_count;
     return std::nullopt;
+  } else {
+    error_count = 0;
   }
 
   // We use the time here as the timestamp for the latest reading. This is,
@@ -435,6 +454,19 @@ std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
     counter++;
   }
   return safety_velocity_limits;
+}
+
+std::vector<float> WxArmorDriver::GetSafetyCurrentLimits() {
+  std::vector<float> safety_current_limits;
+
+  for (const auto &motor : profile_.motors) {
+    float limit = motor.current_limit;
+    if (limit < 1) {
+      limit = 1200;
+    }
+    safety_current_limits.push_back(limit);
+  }
+  return safety_current_limits;
 }
 
 void WxArmorDriver::SetPosition(const std::vector<float> &position,
@@ -558,6 +590,7 @@ void WxArmorDriver::InitReadHandler() {
   read_position_address_ = AddItemToRead("Present_Position");
   read_velocity_address_ = AddItemToRead("Present_Velocity");
   read_current_address_ = AddItemToRead("Present_Current");
+  read_error_address_ = AddItemToRead("Hardware_Error_Status");
 
   read_handler_index_ = dxl_wb_.getTheNumberOfSyncReadHandler();
   if (!dxl_wb_.addSyncReadHandler(read_start_, read_end_ - read_start_)) {

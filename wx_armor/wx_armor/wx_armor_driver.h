@@ -67,6 +67,7 @@ struct SensorData {
   std::vector<float> pos{};  // joint position
   std::vector<float> vel{};  // joint velocity
   std::vector<float> crt{};  // motor electric current of this joint
+  std::vector<uint32_t> err{};  // per joint error codes
 
   // ┌──────────────────┐
   // │ Metadata         │
@@ -77,7 +78,7 @@ struct SensorData {
   // error, it is only expected to be used as a reference.
   int64_t timestamp = 0;
 
-  NLOHMANN_DEFINE_TYPE_INTRUSIVE(SensorData, pos, vel, crt, timestamp);
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(SensorData, pos, vel, crt, err, timestamp);
 };
 
 /**
@@ -155,12 +156,26 @@ class WxArmorDriver {
   std::optional<SensorData> Read();
 
   /**
+   * @brief Check that all motors are health.
+   *
+   * @return Returns true if all motors are reachable and false otherwise.
+   */
+  bool MotorHealthCheck();
+
+  /**
    * @brief Reads the safety velocity limits from RobotProfile and returns it.
    *
    * @return An array containing the safety velocity limits for each motor
    *         [rad/s].
    */
   std::vector<float> GetSafetyVelocityLimits();
+
+  /**
+   * @brief Reads the safety current limits from RobotProfile and returns it.
+   *
+   * @return An array containing the safety current limits for each motor [mA].
+   */
+  std::vector<float> GetSafetyCurrentLimits();
 
   /**
    * @brief Sets the position of the robot's joints, with a desired moving and
@@ -252,6 +267,11 @@ class WxArmorDriver {
    */
   void ResetSafetyViolationMode();
 
+  /**
+   * @brief Returns the profile of the robot.
+   */
+  const RobotProfile &Profile() const { return profile_; }
+
  private:
   ControlItem AddItemToRead(const std::string &name);
 
@@ -286,6 +306,7 @@ class WxArmorDriver {
   ControlItem read_position_address_;
   ControlItem read_velocity_address_;
   ControlItem read_current_address_;
+  ControlItem read_error_address_;
 
   // Union address interval of the above 3. Note that `read_end_` address is
   // not inclusive (open interval). We need this so that we can issue command
