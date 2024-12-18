@@ -267,6 +267,11 @@ class WxArmorDriver {
    */
   void ResetSafetyViolationMode();
 
+  /**
+   * @brief Returns the profile of the robot.
+   */
+  const RobotProfile &Profile() const { return profile_; }
+
  private:
   ControlItem AddItemToRead(const std::string &name);
 

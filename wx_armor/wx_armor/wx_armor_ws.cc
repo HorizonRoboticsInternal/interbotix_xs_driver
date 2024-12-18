@@ -185,9 +185,10 @@ WxArmorWebController::GuardianThread::GuardianThread() {
       if (sensor_data.has_value() || Driver()->SafetyViolationTriggered()) {
         if (!sensor_data.has_value()) {
           // If we have an error, we still want to publish the error codes
-          sensor_data = SensorData{.pos = std::vector<float>{0,0,0,0,0,0,0},
-                                   .vel = std::vector<float>{0,0,0,0,0,0,0},
-                                   .crt = std::vector<float>{0,0,0,0,0,0,0},
+          static const uint8_t num_joints = Driver()->Profile().joint_ids.size();
+          sensor_data = SensorData{.pos = std::vector<float>(num_joints),
+                                   .vel = std::vector<float>(num_joints),
+                                   .crt = std::vector<float>(num_joints),
                                    .err = error_codes_,
                                    .timestamp = -1};
         } else {
