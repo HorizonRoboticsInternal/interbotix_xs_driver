@@ -43,6 +43,7 @@ if [ "$FRESH_INSTALL" = true ]; then
 
 
     # Update cmake to version >= 3.23 for Ubuntu 22.04
+    # This should be satisfied for Ubuntu 24.04
     # For other repos, refer to
     # https://askubuntu.com/questions/355565/how-do-i-install-the-latest-version-of-cmake-from-the-command-line#:~:text=Kitware%20now%20has%20an%20APT%20repository%20that%20currently%20supports%2020.04%2C%2022.04%20and%2024.04.
     # Get the installed version of CMake
