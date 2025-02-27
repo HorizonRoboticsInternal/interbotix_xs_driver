@@ -34,21 +34,16 @@
 #include <string>
 
 // define logging macros
-#define XSLOG_DEBUG(...) interbotix_xs::logging::log( \
-    interbotix_xs::logging::Level::DEBUG, \
-    __VA_ARGS__)
-#define XSLOG_INFO(...) interbotix_xs::logging::log( \
-    interbotix_xs::logging::Level::INFO, \
-    __VA_ARGS__)
-#define XSLOG_WARN(...) interbotix_xs::logging::log( \
-    interbotix_xs::logging::Level::WARN, \
-    __VA_ARGS__)
-#define XSLOG_ERROR(...) interbotix_xs::logging::log( \
-    interbotix_xs::logging::Level::ERROR, \
-    __VA_ARGS__)
-#define XSLOG_FATAL(...) interbotix_xs::logging::log( \
-    interbotix_xs::logging::Level::FATAL, \
-    __VA_ARGS__)
+#define XSLOG_DEBUG(...)                                                                           \
+    interbotix_xs::logging::log(interbotix_xs::logging::Level::DEBUG, __VA_ARGS__)
+#define XSLOG_INFO(...)                                                                            \
+    interbotix_xs::logging::log(interbotix_xs::logging::Level::INFO, __VA_ARGS__)
+#define XSLOG_WARN(...)                                                                            \
+    interbotix_xs::logging::log(interbotix_xs::logging::Level::WARN, __VA_ARGS__)
+#define XSLOG_ERROR(...)                                                                           \
+    interbotix_xs::logging::log(interbotix_xs::logging::Level::ERROR, __VA_ARGS__)
+#define XSLOG_FATAL(...)                                                                           \
+    interbotix_xs::logging::log(interbotix_xs::logging::Level::FATAL, __VA_ARGS__)
 
 namespace interbotix_xs
 {
@@ -56,13 +51,12 @@ namespace interbotix_xs
 namespace logging
 {
 
-enum Level
-{
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-  FATAL = 4
+enum Level {
+    DEBUG = 0,
+    INFO = 1,
+    WARN = 2,
+    ERROR = 3,
+    FATAL = 4
 };
 
 // The logging level - anything higher than this level will be logged
@@ -70,7 +64,7 @@ static Level _level = Level::INFO;
 
 /// @brief Log a message
 /// @param level The level with which to log the message
-void log(Level level, const char * fmt, ...);
+void log(Level level, const char* fmt, ...);
 
 /// @brief Set the logging level
 /// @param level the new logging level
@@ -87,6 +81,5 @@ Level get_level();
 }  // namespace logging
 
 }  // namespace interbotix_xs
-
 
 #endif  // INTERBOTIX_XS_DRIVER__XS_LOGGING_HPP_

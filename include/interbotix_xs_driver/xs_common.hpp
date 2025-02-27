@@ -29,13 +29,13 @@
 #ifndef INTERBOTIX_XS_DRIVER__XS_COMMON_HPP_
 #define INTERBOTIX_XS_DRIVER__XS_COMMON_HPP_
 
-#include "interbotix_xs_driver/xs_logging.hpp"
-
 #include <chrono>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "interbotix_xs_driver/xs_logging.hpp"
 
 namespace interbotix_xs
 {
@@ -67,12 +67,12 @@ inline static const std::string DEFAULT_OP_MODE = "position";
 // Default motor profile type is 'velocity' (as opposed to 'time')
 inline static const std::string DEFAULT_PROF_TYPE = "velocity";
 
-// Allow joint velocity to be infinite when in position control mode - makes robot very reactive to
-// joint commands
+// Allow joint velocity to be infinite when in position control mode - makes
+// robot very reactive to joint commands
 static const int32_t DEFAULT_PROF_VEL = 0;
 
-// Allow joint acceleration to be infinite when in position control mode - makes robot very
-// reactive to joint commands
+// Allow joint acceleration to be infinite when in position control mode - makes
+// robot very reactive to joint commands
 static const int32_t DEFAULT_PROF_ACC = 0;
 
 // Torque motor on by default
@@ -111,67 +111,67 @@ namespace profile
 inline static const std::string VELOCITY = "velocity";
 inline static const std::string TIME = "time";
 
-}  // profile
-
+}  // namespace profile
 
 // Struct to hold multiple joints that represent a group
 struct JointGroup
 {
-  // Names of all joints in the group
-  std::vector<std::string> joint_names;
-  // Dynamixel ID of all joints in the group
-  std::vector<uint8_t> joint_ids;
-  // Number of joints in the group
-  uint8_t joint_num;
-  // Operating Mode for all joints in the group
-  std::string mode;
-  // Profile Type ('velocity' or 'time') for all joints in the group
-  std::string profile_type;
-  // Profile Velocity (in ms) for all joints in the group
-  int32_t profile_velocity;
-  // Profile Acceleration (in ms) for all joints in the group
-  int32_t profile_acceleration;
+    // Names of all joints in the group
+    std::vector<std::string> joint_names;
+    // Dynamixel ID of all joints in the group
+    std::vector<uint8_t> joint_ids;
+    // Number of joints in the group
+    uint8_t joint_num;
+    // Operating Mode for all joints in the group
+    std::string mode;
+    // Profile Type ('velocity' or 'time') for all joints in the group
+    std::string profile_type;
+    // Profile Velocity (in ms) for all joints in the group
+    int32_t profile_velocity;
+    // Profile Acceleration (in ms) for all joints in the group
+    int32_t profile_acceleration;
 };
 
 // Struct to hold data on a single motor
 struct MotorState
 {
-  // Dynamixel ID of the motor
-  uint8_t motor_id;
-  // Operating Mode of the motor
-  std::string mode;
-  // Profile Type ('velocity' or 'time') for the motor
-  std::string profile_type;
-  // Profile Velocity (in ms) for the motor
-  int32_t profile_velocity;
-  // Profile Acceleration (in ms) for the motor
-  int32_t profile_acceleration;
+    // Dynamixel ID of the motor
+    uint8_t motor_id;
+    // Operating Mode of the motor
+    std::string mode;
+    // Profile Type ('velocity' or 'time') for the motor
+    std::string profile_type;
+    // Profile Velocity (in ms) for the motor
+    int32_t profile_velocity;
+    // Profile Acceleration (in ms) for the motor
+    int32_t profile_acceleration;
 };
 
 // Struct to hold data on an Interbotix Gripper
 struct Gripper
 {
-  // Index in the published JointState message 'name' list belonging to the gripper motor
-  size_t js_index;
-  // Distance [m] from the motor horn's center to its edge
-  float horn_radius;
-  // Distance [m] from the edge of the motor horn to a finger
-  float arm_length;
-  // Name of the 'left_finger' joint as defined in the URDF (if present)
-  std::string left_finger;
-  // Name of the 'right_finger' joint as defined in the URDF (if present)
-  std::string right_finger;
+    // Index in the published JointState message 'name' list belonging to the
+    // gripper motor
+    size_t js_index;
+    // Distance [m] from the motor horn's center to its edge
+    float horn_radius;
+    // Distance [m] from the edge of the motor horn to a finger
+    float arm_length;
+    // Name of the 'left_finger' joint as defined in the URDF (if present)
+    std::string left_finger;
+    // Name of the 'right_finger' joint as defined in the URDF (if present)
+    std::string right_finger;
 };
 
 // Struct to hold a desired register value for a given motor
 struct MotorRegVal
 {
-  // Dynamixel ID of a motor
-  uint8_t motor_id;
-  // Register name
-  std::string reg;
-  // Value to write to the above register for the specified motor
-  int32_t value;
+    // Dynamixel ID of a motor
+    uint8_t motor_id;
+    // Register name
+    std::string reg;
+    // Value to write to the above register for the specified motor
+    int32_t value;
 };
 
 using MapGroup = std::unordered_map<std::string, JointGroup>;

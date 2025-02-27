@@ -1,28 +1,55 @@
-# This file is used by clang-format to autoformat SocialBot source code
-#
-# The clang-format is part of llvm toolchain.
-# It need to install llvm and clang to format source code style.
-#
-# The basic usage is,
-#   clang-format -i -style=file PATH/TO/SOURCE/CODE
-#
-# The -style=file implicit use ".clang-format" file located in one of
-# parent directory.
-# The -i means inplace change.
-#
-# The document of clang-format is
-#   http://clang.llvm.org/docs/ClangFormat.html
-#   http://clang.llvm.org/docs/ClangFormatStyleOptions.html
----
-Language:        Cpp
-BasedOnStyle:  Google
-IndentWidth:     2
-TabWidth:        2
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AllowShortBlocksOnASingleLine: Never
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: Never
+  AfterClass: true
+  AfterFunction: false
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeColon
+BreakInheritanceList: AfterComma
+BreakStringLiterals: true
+BreakTemplateDeclarations: Yes
+ColumnLimit: 100
 ContinuationIndentWidth: 4
-AccessModifierOffset: -1  # The private/protected/public has no indent in class
-Standard:  Cpp11
-AllowAllParametersOfDeclarationOnNextLine: true
-BinPackParameters: false
-BinPackArguments: false
-SortIncludes: true
-...
+IndentWidth: 4
+IndentCaseLabels: true
+IncludeBlocks: Preserve
+QualifierAlignment: Left
+ReferenceAlignment: Left
+ReflowComments: true
+PointerAlignment: Left
+RemoveParentheses: MultipleParentheses
+SeparateDefinitionBlocks: Always
+SortUsingDeclarations: LexicographicNumeric
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpacesBeforeTrailingComments: 2
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1
+Standard: Latest

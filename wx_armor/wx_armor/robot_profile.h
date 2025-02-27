@@ -24,27 +24,29 @@
 
 #pragma once
 
+#include <math.h>
+
 #include <chrono>
 #include <cstdlib>
 #include <map>
 #include <string_view>
 #include <vector>
-#include <math.h>
 
 #include "yaml-cpp/yaml.h"
 
-namespace horizon::wx_armor {
+namespace horizon::wx_armor
+{
 
 // Enum for the operating mode of the underlying Dynamixel motors. This
 // determines how the underlying controller works and what kind of commands the
 // motor accepts.
 enum class OpMode : int {
-  CURRENT = 0,                 // Electric current controller
-  VELOCITY = 1,                // Velocity controller
-  POSITION = 3,                // Position controller
-  CURRENT_BASED_POSITION = 5,  // Current based position controller
-  PWM = 16,                    // Pulse-width modulation controller
-  TORQUE = 100,                // Torque controller
+    CURRENT = 0,                 // Electric current controller
+    VELOCITY = 1,                // Velocity controller
+    POSITION = 3,                // Position controller
+    CURRENT_BASED_POSITION = 5,  // Current based position controller
+    PWM = 16,                    // Pulse-width modulation controller
+    TORQUE = 100,                // Torque controller
 };
 
 // Convert the OpMode enum to a string e.g. for debugging purpose.
@@ -53,41 +55,44 @@ std::string_view OpModeName(OpMode mode);
 // Stores the metadata of a Dynamixel motor in the robot. Each motor in the
 // robot is associated with an "ID". When communicating with the motors, the
 // APIs use the id to specify which motor they talk to.
-struct MotorInfo {
-  // Dynamixel ID of the motor
-  uint8_t id = 0;
+struct MotorInfo
+{
+    // Dynamixel ID of the motor
+    uint8_t id = 0;
 
-  // Name of the motor.
-  std::string name = "unknown";
+    // Name of the motor.
+    std::string name = "unknown";
 
-  // If the motor is powering the joint together with other shadow motors (which
-  // makes this motor a "master" motor), this is a list of IDs of the
-  // corresponding shadow motors. Otherwise if the motor is powering the joint
-  // alone, this list is empty.
-  std::vector<uint8_t> shadow_motor_ids{};
+    // If the motor is powering the joint together with other shadow motors
+    // (which makes this motor a "master" motor), this is a list of IDs of the
+    // corresponding shadow motors. Otherwise if the motor is powering the joint
+    // alone, this list is empty.
+    std::vector<uint8_t> shadow_motor_ids{};
 
-  // The following information are currently not used at this moment. Having
-  // them here just to be consistent with dynamixel.
-  OpMode op_mode = OpMode::POSITION;
+    // The following information are currently not used at this moment. Having
+    // them here just to be consistent with dynamixel.
+    OpMode op_mode = OpMode::POSITION;
 
-  // The current limit. If it is zero, the motor will be in OpMode::POSITION,
-  // otherwise, it will be in OpMode::CURRENT_BASED_POSITION.
-  uint32_t current_limit = 0;
+    // The current limit. If it is zero, the motor will be in OpMode::POSITION,
+    // otherwise, it will be in OpMode::CURRENT_BASED_POSITION.
+    uint32_t current_limit = 0;
 
-  // The safety velocity limit in [rad/s]
-  float safety_vel_limit = M_PI / 2;
+    // The safety velocity limit in [rad/s]
+    float safety_vel_limit = M_PI / 2;
 };
 
 // The EERPROM area of each motor is logically organized as a few key/value
 // pairs, similar to a registry. This class is used to represent such a
 // key/value pair, together with their associated motor ID.
-struct RegistryKV {
-  uint8_t motor_id;
-  std::string key;
-  int32_t value;
+struct RegistryKV
+{
+    uint8_t motor_id;
+    std::string key;
+    int32_t value;
 
-  RegistryKV(uint8_t motor_id_, const std::string &key_, int32_t value_)
-      : motor_id(motor_id_), key(key_), value(value_) {}
+    RegistryKV(uint8_t motor_id_, const std::string& key_, int32_t value_)
+        : motor_id(motor_id_), key(key_), value(value_) {
+    }
 };
 
 // This class stores the full information about a Dynamixel motor based robot.
@@ -99,38 +104,40 @@ struct RegistryKV {
 //
 // Such information is usually stored in a yaml file. When parsed, the yaml file
 // becomes a RobotProfile instance.
-struct RobotProfile {
-  std::vector<MotorInfo> motors{};
-  std::vector<uint8_t> joint_ids{};
-  std::vector<std::string> joint_names{};
-  std::vector<RegistryKV> eeprom{};
+struct RobotProfile
+{
+    std::vector<MotorInfo> motors{};
+    std::vector<uint8_t> joint_ids{};
+    std::vector<std::string> joint_names{};
+    std::vector<RegistryKV> eeprom{};
 
-  RobotProfile() = default;
-  RobotProfile(RobotProfile &&) = default;
-  RobotProfile &operator=(RobotProfile &) = default;
+    RobotProfile() = default;
+    RobotProfile(RobotProfile&&) = default;
+    RobotProfile& operator=(RobotProfile&) = default;
 
-  // API to access a motor by its name. Returns nullptr if such motor does not
-  // exist in this robot.
-  inline const MotorInfo *motor(const std::string name) const {
-    for (const MotorInfo &entry : motors) {
-      if (entry.name == name) {
-        return &entry;
-      }
+    // API to access a motor by its name. Returns nullptr if such motor does not
+    // exist in this robot.
+    inline const MotorInfo* motor(const std::string name) const {
+        for (const MotorInfo& entry : motors) {
+            if (entry.name == name) {
+                return &entry;
+            }
+        }
+        return nullptr;
     }
-    return nullptr;
-  }
 };
 
 }  // namespace horizon::wx_armor
 
-namespace YAML {
+namespace YAML
+{
 
 // Specialization of YAML::convert for RobotPRofile. so that we can parse yaml
 // into RobotProfile.
 template <>
-struct convert<horizon::wx_armor::RobotProfile> {
-  static bool decode(const Node &node,
-                     horizon::wx_armor::RobotProfile &profile);
+struct convert<horizon::wx_armor::RobotProfile>
+{
+    static bool decode(const Node& node, horizon::wx_armor::RobotProfile& profile);
 };
 
 }  // namespace YAML
