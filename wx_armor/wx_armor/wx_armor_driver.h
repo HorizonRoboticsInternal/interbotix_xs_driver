@@ -275,6 +275,8 @@ class WxArmorDriver
         return profile_;
     }
 
+    bool checkMotorHealth();
+
   private:
     ControlItem AddItemToRead(const std::string& name);
 

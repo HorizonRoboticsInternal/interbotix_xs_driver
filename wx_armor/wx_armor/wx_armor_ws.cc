@@ -21,7 +21,7 @@ namespace horizon::wx_armor
 
 WxArmorWebController::WxArmorWebController()
     : guardian_thread_(std::make_shared<GuardianThread>()) {
-    motor_health_thread_ = std::make_shared<MotorHealthThread>(guardian_thread_);
+    //    motor_health_thread_ = std::make_shared<MotorHealthThread>(guardian_thread_);
 }
 
 void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
@@ -134,6 +134,8 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, fl
             return;
         }
     }
+    bool success = Driver()->checkMotorHealth();
+    spdlog::info("checkMotorHealth = {}", success);
     Driver()->SetPosition(cmd, moving_time);
 }
 

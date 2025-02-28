@@ -325,8 +325,13 @@ WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_
 WxArmorDriver::~WxArmorDriver() {
 }
 
+bool WxArmorDriver::checkMotorHealth() {
+    int32_t value = 0;
+    return dxl_wb_.itemRead(7, "Hardware_Error_Status", &value);
+}
+
 bool WxArmorDriver::MotorHealthCheck() {
-    std::unique_lock<std::mutex> handler_lock{io_mutex_};
+    //    std::unique_lock<std::mutex> handler_lock{io_mutex_};
     return PingMotors(&dxl_wb_, profile_,
                       /* log_errors_only */ true,
                       /* num_trials */ 1);
