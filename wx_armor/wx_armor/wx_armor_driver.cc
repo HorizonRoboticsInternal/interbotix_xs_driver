@@ -326,8 +326,19 @@ WxArmorDriver::~WxArmorDriver() {
 }
 
 bool WxArmorDriver::checkMotorHealth() {
-    int32_t value = 0;
-    return dxl_wb_.itemRead(7, "Hardware_Error_Status", &value);
+    std::unique_lock<std::mutex> handler_lock{io_mutex_};
+    for (const MotorInfo& motor : profile_.motors) {
+        int32_t curr_motor_error = 0;
+        bool read_success = dxl_wb_.itemRead(motor.id, "Hardware_Error_Status", &curr_motor_error);
+
+        // If read failed or motor has error
+        if (!read_success || curr_motor_error != 0) {
+            spdlog::warn("Motor {} '{}' error status: {} (read success: {})", motor.id, motor.name,
+                         curr_motor_error, read_success);
+            return false;  // Not healthy
+        }
+    }
+    return true;
 }
 
 bool WxArmorDriver::MotorHealthCheck() {
