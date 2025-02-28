@@ -420,6 +420,19 @@ std::optional<SensorData> WxArmorDriver::Read() {
         result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
     }
 
+    // 4. Extract Errors
+
+    for (const MotorInfo& motor : profile_.motors) {
+        int32_t curr_motor_error = 0;
+        bool read_success = dxl_wb_.itemRead(motor.id, "Hardware_Error_Status", &curr_motor_error);
+
+        // If read failed or motor has error
+        result.err[motor.id - 1] = 0;
+        if (!read_success || curr_motor_error != 0) {
+            result.err[motor.id - 1] = 1;
+        }
+    }
+
     return std::move(result);
 }
 

@@ -135,16 +135,21 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, fl
         }
     }
     //    if (!Driver()->SafetyViolationTriggered() && !Driver()->MotorHealthCheck()) {
-    Driver()->SetPosition(cmd, moving_time);
-
-    bool success = Driver()->checkMotorHealth();
-    if (!Driver()->SafetyViolationTriggered() && !success) {
-        const SensorData readings = guardian_thread_->GetCachedSensorData();
-        Driver()->TriggerSafetyViolationMode();
-        guardian_thread_->SetErrorCode(0, GuardianThread::kErrorMotorNotReachable);
-        SlowDownToStop(readings);
+    if (!Driver()->SafetyViolationTriggered()) {
+        Driver()->SetPosition(cmd, moving_time);
     }
-    spdlog::info("checkMotorHealth = {}", success);
+    else {
+        spdlog::warn("Ignoring a command because safety violation is triggered.");
+    }
+
+    //    bool success = Driver()->checkMotorHealth();
+    //    if (!Driver()->SafetyViolationTriggered() && !success) {
+    //        const SensorData readings = guardian_thread_->GetCachedSensorData();
+    //        Driver()->TriggerSafetyViolationMode();
+    //        guardian_thread_->SetErrorCode(0, GuardianThread::kErrorMotorNotReachable);
+    //        SlowDownToStop(readings);
+    //    }
+    //    spdlog::info("checkMotorHealth = {}", success);
 }
 
 }  // namespace horizon::wx_armor
