@@ -41,7 +41,6 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <thread>
 
 #include "dynamixel_workbench_toolbox/dynamixel_workbench.h"
 #include "nlohmann/json.hpp"
@@ -339,5 +338,46 @@ class WxArmorDriver
     // velocity limits are violated.
     std::atomic_bool safety_violation_{false};
 };
+
+// Helper function to read the environment variable.
+// Used by the Driver() function below.
+template <typename T>
+T GetEnv(const char* name, T default_value) {
+    const char* text = std::getenv(name);
+
+    if (text == nullptr) {
+        return default_value;
+    }
+
+    if constexpr (std::is_same_v<T, std::string>) {
+        return std::string(text);
+    }
+    else if constexpr (std::is_integral_v<T>) {
+        return static_cast<T>(std::stoi(text));
+    }
+    else if constexpr (std::is_same_v<T, std::filesystem::path>) {
+        return std::filesystem::path(text);
+    }
+
+    std::abort();
+}
+
+/**
+ * @brief Helper function for issuing a command a decelerate to zero command to the driver.
+ *
+ * @param curr_reading The current sensor reading.
+ * @param dt The current control time step.
+ * @param deceleration_time The time to decelerate over.
+ */
+void SlowDownToStop(const SensorData& curr_reading, float dt = 0.5, float deceleration_time = 1.5);
+
+/**
+ * @brief Getter for the driver.
+ *
+ * Can be used by any downstream logic and threads.
+ *
+ * @return A pointer to the driver.
+ */
+WxArmorDriver* Driver();
 
 }  // namespace horizon::wx_armor

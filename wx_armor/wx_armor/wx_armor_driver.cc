@@ -637,4 +637,37 @@ void WxArmorDriver::InitWriteHandler() {
     }
 }
 
+WxArmorDriver* Driver() {
+    static std::unique_ptr<WxArmorDriver> driver = []() {
+        std::string usb_port = GetEnv<std::string>("WX_ARMOR_USB_PORT", "/dev/ttyDXL");
+        std::filesystem::path motor_config = GetEnv<std::filesystem::path>(
+            "WX_ARMOR_MOTOR_CONFIG",
+            std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "configs" /
+                "wx250s_motor_config.yaml");
+        int flash_eeprom = true;
+        return std::make_unique<WxArmorDriver>(usb_port, motor_config,
+                                               static_cast<bool>(flash_eeprom));
+    }();
+    return driver.get();
+}
+
+void SlowDownToStop(const SensorData& curr_reading, float dt, float deceleration_time) {
+    std::vector<float> curr_pos = curr_reading.pos;
+    std::vector<float> curr_vel = curr_reading.vel;
+    std::vector<float> targets;
+
+    for (size_t i = 0; i < curr_pos.size(); i++) {
+        // Just some simple kinematic integration to minimize acceleration
+        // changes
+        float curr_target = curr_pos[i] + curr_vel[i] * dt;
+        targets.push_back(curr_target);
+    }
+
+    // Overwrite the current trajectory with our decelerating one.
+    Driver()->SetPosition(targets, deceleration_time, 0.49 * deceleration_time);
+    // SetPID to zero Kp, large Kd and zero Ki to drop to the ground from
+    // current pos.
+    Driver()->SetPID({{"all", 0, 0, 80000}});
+}
+
 }  // namespace horizon::wx_armor

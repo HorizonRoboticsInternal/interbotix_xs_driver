@@ -56,6 +56,20 @@ target_link_libraries(wx_armor_driver PUBLIC
     nlohmann_json::nlohmann_json
     yaml-cpp)
 
+add_library(guardian_thread STATIC)
+target_sources(guardian_thread
+        PUBLIC
+        FILE_SET HEADERS
+        BASE_DIRS wx_armor
+        FILES wx_armor/guardian_thread.h
+        PRIVATE wx_armor/guardian_thread.cc)
+target_link_libraries(guardian_thread PUBLIC
+        Drogon::Drogon
+        wx_armor_driver
+        spdlog::spdlog
+        nlohmann_json::nlohmann_json
+)
+
 add_library(wx_armor_ws STATIC)
 target_sources(wx_armor_ws
     PUBLIC
@@ -66,6 +80,7 @@ target_sources(wx_armor_ws
 target_link_libraries(wx_armor_ws PUBLIC
     Drogon::Drogon
     spdlog::spdlog
+    guardian_thread
     wx_armor_driver)
 
 add_executable(wx_armor)
@@ -87,7 +102,7 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 
 install(
-    TARGETS robot_profile wx_armor_driver wx_armor_ws wx_armor
+    TARGETS robot_profile wx_armor_driver wx_armor_ws wx_armor guardian_thread
     EXPORT ${PROJECT_NAME}_Targets
     FILE_SET HEADERS)
 
