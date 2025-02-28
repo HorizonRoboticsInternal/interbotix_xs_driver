@@ -70,6 +70,19 @@ target_link_libraries(guardian_thread PUBLIC
         nlohmann_json::nlohmann_json
 )
 
+add_library(motor_health_thread STATIC)
+target_sources(motor_health_thread
+        PUBLIC
+        FILE_SET HEADERS
+        BASE_DIRS wx_armor
+        FILES wx_armor/motor_health_thread.h
+        PRIVATE wx_armor/motor_health_thread.cc)
+target_link_libraries(motor_health_thread PUBLIC
+        wx_armor_driver
+        spdlog::spdlog
+        guardian_thread
+)
+
 add_library(wx_armor_ws STATIC)
 target_sources(wx_armor_ws
     PUBLIC
@@ -81,6 +94,7 @@ target_link_libraries(wx_armor_ws PUBLIC
     Drogon::Drogon
     spdlog::spdlog
     guardian_thread
+    motor_health_thread
     wx_armor_driver)
 
 add_executable(wx_armor)
@@ -102,7 +116,7 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 
 install(
-    TARGETS robot_profile wx_armor_driver wx_armor_ws wx_armor guardian_thread
+    TARGETS robot_profile wx_armor_driver wx_armor_ws wx_armor guardian_thread motor_health_thread
     EXPORT ${PROJECT_NAME}_Targets
     FILE_SET HEADERS)
 

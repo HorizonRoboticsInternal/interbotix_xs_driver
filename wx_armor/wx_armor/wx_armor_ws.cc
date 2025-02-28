@@ -9,12 +9,20 @@
 #include "nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 
+#include "wx_armor/guardian_thread.h"
+#include "wx_armor/motor_health_thread.h"
+
 using drogon::HttpRequestPtr;
 using drogon::WebSocketConnectionPtr;
 using drogon::WebSocketMessageType;
 
 namespace horizon::wx_armor
 {
+
+WxArmorWebController::WxArmorWebController()
+    : guardian_thread_(std::make_shared<GuardianThread>()) {
+    motor_health_thread_ = std::make_shared<MotorHealthThread>(guardian_thread_);
+}
 
 void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
                                             std::string&& message,
@@ -42,7 +50,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
         // motors
         spdlog::error("SETPID ignored.  Cannot read");
     }
-    else if (Driver()->SafetyViolationTriggered() && !Match("SETPID") && !Match("MOVETO")) {
+    else if (!Match("SETPID") && !Match("MOVETO") && Driver()->SafetyViolationTriggered()) {
         // If safety violation is triggered, ignore all commands except SETPID
         // which resets error status, and MOVETO which allows the client to set
         // the jointpos command to the current position to avoid jumps after
@@ -89,25 +97,25 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
     else if (Match("SETPID")) {
         std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
         Driver()->SetPID(gain_cfgs);
-        guardian_thread_.ResetErrorCodes();
+        guardian_thread_->ResetErrorCodes();
     }
 }
 
 void WxArmorWebController::handleConnectionClosed(const WebSocketConnectionPtr& conn) {
-    guardian_thread_.Unsubscribe(conn);
+    guardian_thread_->Unsubscribe(conn);
     spdlog::info("A connection is closed.");
 }
 
 void WxArmorWebController::handleNewConnection(const HttpRequestPtr& req,
                                                const WebSocketConnectionPtr& conn) {
     conn->setContext(std::make_shared<ClientState>());
-    guardian_thread_.Subscribe(conn);
+    guardian_thread_->Subscribe(conn);
     spdlog::info("A new connection is established.");
     conn->send("ok");
 }
 
 void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, float moving_time) {
-    const SensorData readings = guardian_thread_.GetCachedSensorData();
+    const SensorData readings = guardian_thread_->GetCachedSensorData();
     for (int i = 0; i + 1 < cmd.size(); i++) {
         // Ignore last position for the grippers
         float reading = readings.pos.at(i);
@@ -115,24 +123,18 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, fl
         float thd = 0.2;
         if (moving_time > 0.1)
             thd = 2.5 * moving_time;
-        if (!Driver()->SafetyViolationTriggered() && fabs(reading - cmd[i]) > thd) {
+        if (fabs(reading - cmd[i]) > thd && !Driver()->SafetyViolationTriggered()) {
             spdlog::error("Joint {} command is out of range: {} -> {} > {}. Command "
                           "ignored.",
                           i, reading, cmd[i], thd);
             Driver()->TriggerSafetyViolationMode();
-            guardian_thread_.SetErrorCode(i, GuardianThread::kErrorCommandDeltaTooLarge);
+            guardian_thread_->SetErrorCode(i, GuardianThread::kErrorCommandDeltaTooLarge);
             SlowDownToStop(readings);
             // guardian_thread_.KillConnections();
             return;
         }
     }
     Driver()->SetPosition(cmd, moving_time);
-    if (!Driver()->SafetyViolationTriggered() && !Driver()->MotorHealthCheck()) {
-        Driver()->TriggerSafetyViolationMode();
-        guardian_thread_.SetErrorCode(0, GuardianThread::kErrorMotorNotReachable);
-        SlowDownToStop(readings);
-        return;
-    }
 }
 
 }  // namespace horizon::wx_armor
