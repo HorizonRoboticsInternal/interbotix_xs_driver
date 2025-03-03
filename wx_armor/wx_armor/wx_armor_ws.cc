@@ -1,5 +1,6 @@
 #include "wx_armor/wx_armor_ws.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -19,6 +20,9 @@ namespace horizon::wx_armor
 void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
                                             std::string&& message,
                                             const WebSocketMessageType& type) {
+    spdlog::info("{}", message);
+    auto s = std::chrono::high_resolution_clock::now();
+
     std::string_view payload{};
 
     // Valid message should be in the format of "<COMMAND> <PAYLOAD>". This
@@ -91,6 +95,12 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
         Driver()->SetPID(gain_cfgs);
         guardian_thread_.ResetErrorCodes();
     }
+
+    auto e = std::chrono::high_resolution_clock::now();
+    auto duration = e - s;
+    auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+
+    spdlog::info(sec.count());
 }
 
 void WxArmorWebController::handleConnectionClosed(const WebSocketConnectionPtr& conn) {
