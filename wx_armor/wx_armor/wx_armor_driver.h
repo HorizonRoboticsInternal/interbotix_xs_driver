@@ -285,8 +285,8 @@ class WxArmorDriver
     /**
      * @brief Returns the mutex that protects dxl_wb_ IO.
      */
-    std::mutex& IOMutex() {
-        return io_mutex_;
+    std::mutex* IOMutex() {
+        return &io_mutex_;
     }
 
   private:

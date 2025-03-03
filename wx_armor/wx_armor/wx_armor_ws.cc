@@ -144,7 +144,7 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, fl
         auto dxl_wb = Driver()->DxlWb();
         bool all_motors_healthy = true;
         {
-            std::unique_lock<std::mutex> handler_lock{Driver()->IOMutex()};
+            std::unique_lock<std::mutex> handler_lock{*(Driver()->IOMutex())};
 
             for (const auto& motor : Driver()->Profile().motors) {
                 int32_t curr_motor_error = 0;
