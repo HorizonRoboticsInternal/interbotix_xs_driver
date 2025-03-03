@@ -282,6 +282,13 @@ class WxArmorDriver
         return dxl_wb_;
     }
 
+    /**
+     * @brief Returns the mutex that protects dxl_wb_ IO.
+     */
+    std::mutex& IOMutex() {
+        return io_mutex_;
+    }
+
   private:
     ControlItem AddItemToRead(const std::string& name);
 

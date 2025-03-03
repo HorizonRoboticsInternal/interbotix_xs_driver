@@ -143,33 +143,38 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, fl
     if (!Driver()->SafetyViolationTriggered()) {
         auto dxl_wb = Driver()->DxlWb();
         bool all_motors_healthy = true;
-        for (const auto& motor : Driver()->Profile().motors) {
-            int32_t curr_motor_error = 0;
+        {
+            std::unique_lock<std::mutex> handler_lock{Driver()->IOMutex()};
 
-            // Set the motor index properly for shadow motors
-            int motor_index = motor.id;
-            if (motor_index >= 3) {
-                motor_index -= 1;
-            }
-            if (motor_index >= 5) {
-                motor_index -= 1;
-            }
+            for (const auto& motor : Driver()->Profile().motors) {
+                int32_t curr_motor_error = 0;
 
-            // Check if we can read the motor
-            if (!dxl_wb.itemRead(motor.id, "Hardware_Error_Status", &curr_motor_error)) {
-                guardian_thread_.SetErrorCode(motor_index, GuardianThread::kErrorMotorNotReachable);
-                spdlog::warn("Motor {} '{}' could not be read.", motor.id, motor.name);
-                all_motors_healthy = false;
-                break;
-            }
+                // Set the motor index properly for shadow motors
+                int motor_index = motor.id;
+                if (motor_index >= 3) {
+                    motor_index -= 1;
+                }
+                if (motor_index >= 5) {
+                    motor_index -= 1;
+                }
 
-            // Check to see if there's an error for the motor
-            if (curr_motor_error != 0) {
-                guardian_thread_.SetErrorCode(motor_index, curr_motor_error);
-                spdlog::warn("Motor {} '{}' has error status: {}", motor.id, motor.name,
-                             curr_motor_error);
-                all_motors_healthy = false;
-                break;
+                // Check if we can read the motor
+                if (!dxl_wb.itemRead(motor.id, "Hardware_Error_Status", &curr_motor_error)) {
+                    guardian_thread_.SetErrorCode(motor_index,
+                                                  GuardianThread::kErrorMotorNotReachable);
+                    spdlog::warn("Motor {} '{}' could not be read.", motor.id, motor.name);
+                    all_motors_healthy = false;
+                    break;
+                }
+
+                // Check to see if there's an error for the motor
+                if (curr_motor_error != 0) {
+                    guardian_thread_.SetErrorCode(motor_index, curr_motor_error);
+                    spdlog::warn("Motor {} '{}' has error status: {}", motor.id, motor.name,
+                                 curr_motor_error);
+                    all_motors_healthy = false;
+                    break;
+                }
             }
         }
         if (!all_motors_healthy) {
