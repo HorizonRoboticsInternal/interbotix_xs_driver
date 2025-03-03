@@ -42,7 +42,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
         // motors
         spdlog::error("SETPID ignored.  Cannot read");
     }
-    else if (Driver()->SafetyViolationTriggered() && !Match("SETPID") && !Match("MOVETO")) {
+    else if (!Match("SETPID") && !Match("MOVETO") && Driver()->SafetyViolationTriggered()) {
         // If safety violation is triggered, ignore all commands except SETPID
         // which resets error status, and MOVETO which allows the client to set
         // the jointpos command to the current position to avoid jumps after
@@ -115,7 +115,7 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, fl
         float thd = 0.2;
         if (moving_time > 0.1)
             thd = 2.5 * moving_time;
-        if (!Driver()->SafetyViolationTriggered() && fabs(reading - cmd[i]) > thd) {
+        if (fabs(reading - cmd[i]) > thd && !Driver()->SafetyViolationTriggered()) {
             spdlog::error("Joint {} command is out of range: {} -> {} > {}. Command "
                           "ignored.",
                           i, reading, cmd[i], thd);

@@ -325,11 +325,30 @@ WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_
 WxArmorDriver::~WxArmorDriver() {
 }
 
+// bool WxArmorDriver::MotorHealthCheck() {
+//     std::unique_lock<std::mutex> handler_lock{io_mutex_};
+//     return PingMotors(&dxl_wb_, profile_,
+//                       /* log_errors_only */ true,
+//                       /* num_trials */ 1);
+// }
 bool WxArmorDriver::MotorHealthCheck() {
     std::unique_lock<std::mutex> handler_lock{io_mutex_};
-    return PingMotors(&dxl_wb_, profile_,
-                      /* log_errors_only */ true,
-                      /* num_trials */ 1);
+    for (const MotorInfo& motor : profile_.motors) {
+        int32_t curr_motor_error = 0;
+
+        if (!dxl_wb_.itemRead(motor.id, "Hardware_Error_Status", &curr_motor_error)) {
+            spdlog::warn("Motor {} '{}' could not be read.", motor.id, motor.name);
+            return false;
+        }
+
+        // Ifor motor has error
+        if (curr_motor_error != 0) {
+            spdlog::warn("Motor {} '{}' has error status: {}", motor.id, motor.name,
+                         curr_motor_error);
+            return false;
+        }
+    }
+    return true;
 }
 
 std::optional<SensorData> WxArmorDriver::Read() {
