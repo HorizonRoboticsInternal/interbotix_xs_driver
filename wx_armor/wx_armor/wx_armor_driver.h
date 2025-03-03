@@ -275,6 +275,13 @@ class WxArmorDriver
         return profile_;
     }
 
+    /**
+     * @brief Returns the dynamixel workbench.
+     */
+    const DynamixelWorkbench& DxlWb() const {
+        return dxl_wb_;
+    }
+
   private:
     ControlItem AddItemToRead(const std::string& name);
 

@@ -227,7 +227,8 @@ void SetCurrentLimit(DynamixelWorkbench* dxl_wb, RobotProfile* profile) {
         // support current-based position controller operation mode. In this
         // case, we are still going to use the default position controller
         // operation mode.
-        if (current_limit == 0 || model_name.substr(0, 2) == "XL") {
+        //        if (current_limit == 0 || model_name.substr(0, 2) == "XL") {
+        if (true) {
             motor.op_mode = OpMode::POSITION;
             if (!dxl_wb->setPositionControlMode(motor.id, &log)) {
                 spdlog::critical("Failed to set OpMode to POSITION on motor {} (id = {}): "
