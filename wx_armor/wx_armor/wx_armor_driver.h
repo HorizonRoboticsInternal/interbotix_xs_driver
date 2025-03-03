@@ -275,11 +275,17 @@ class WxArmorDriver
         return profile_;
     }
 
+//    /**
+//     * @brief Returns the dynamixel workbench.
+//     */
+//    const DynamixelWorkbench& DxlWb() const {
+//        return dxl_wb_;
+//    }
     /**
      * @brief Returns the dynamixel workbench.
      */
-    const DynamixelWorkbench& DxlWb() const {
-        return dxl_wb_;
+    DynamixelWorkbench* DxlWb() {
+        return &dxl_wb_;
     }
 
     /**

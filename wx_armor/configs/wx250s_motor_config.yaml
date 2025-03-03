@@ -90,7 +90,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: 2500
     Min_Position_Limit: 819
     Max_Position_Limit: 3345
     Secondary_ID: 255
@@ -104,7 +104,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 5
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: 2500
     Min_Position_Limit: 819
     Max_Position_Limit: 3345
     Secondary_ID: 2
