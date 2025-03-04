@@ -197,53 +197,37 @@ void CalibrateShadowOrDie(DynamixelWorkbench* dxl_wb, const RobotProfile& profil
     }
 }
 
-// Set the current limit of each motor. The current limit effectively determines
-// the maximum torque each motor can generate. This can protect the gears inside
-// the motor when there is a huge external force being applied (e.g. robot
-// hitting the floor).
-//
-// If the current limit is set to 0, it means that there is no current limit. In
-// this case all the motors will work under "position control" operation mode.
-//
-// If the current limit is a non-zero integer, it means that we want to apply
-// the given current limit. In this case all the motors (except for the
-// XL-series motors) will work under "current-based position control" operation
-// mode, which can be thought of as "position control" operation with a current
-// limit. The XL-series motors will still be under "position control" mode.
-//
-// The WidowX 250s robotic arm has 7 XM-series motors and 2-XL series motors.
-void SetCurrentLimit(DynamixelWorkbench* dxl_wb, RobotProfile* profile) {
+/**
+ * @brief Set the control mode of each motor.
+ *
+ * This function sets the control mode of each motor to position control.
+ * Note that XM-series motors also support a current-based position control with a configurable
+ * current limit. This mode should not be used as it produces shaky jittery movements
+ * compared to pure position control. In fact, setting the current limit to the max
+ * still does not reduce oscillations (at this point it should equate to position control).
+ * This problem has been documented by others as well:
+ *
+ * https://forum.robotis.com/t/performance-difference-between-position-mode-and-current-based-position-mode/5583
+ *
+ * Note that instead, we use a software-based current limit for safety. Though it
+ * cannot cap the current during operation and will simply error the motors, it is
+ * necessary to prevent motor damage.
+ *
+ * The WidowX 250s robotic arm has 7 XM-series motors and 2-XL series motors.
+ */
+void SetControlMode(DynamixelWorkbench* dxl_wb, RobotProfile* profile) {
     const char* log = nullptr;
 
     for (MotorInfo& motor : profile->motors) {
         std::string model_name = dxl_wb->getModelName(motor.id);
-        uint32_t current_limit = motor.current_limit;
 
-        // If the current limit (effectively torque limit) is set to a non-zero
-        // value, we should use current-based position controller as the
-        // operation mode, so that we can set current limit to the motor.
-        //
-        // There is one exception. If the motor is an XL series motor, it does
-        // support current-based position controller operation mode. In this
-        // case, we are still going to use the default position controller
-        // operation mode.
-        if (current_limit == 0 || model_name.substr(0, 2) == "XL") {
-            motor.op_mode = OpMode::POSITION;
-            if (!dxl_wb->setPositionControlMode(motor.id, &log)) {
-                spdlog::critical("Failed to set OpMode to POSITION on motor {} (id = {}): "
-                                 "{}",
-                                 motor.name, motor.id, log);
-                std::abort();
-            }
-        }
-        else {
-            motor.op_mode = OpMode::CURRENT_BASED_POSITION;
-            if (!dxl_wb->currentBasedPositionMode(motor.id, current_limit, &log)) {
-                spdlog::critical("Failed to set OpMode to POSITION on motor {} (id = {}): "
-                                 "{}",
-                                 motor.name, motor.id, log);
-                std::abort();
-            }
+        // For all motors, we set the operation mode to position control.
+        motor.op_mode = OpMode::POSITION;
+        if (!dxl_wb->setPositionControlMode(motor.id, &log)) {
+            spdlog::critical("Failed to set OpMode to POSITION on motor {} (id = {}): "
+                             "{}",
+                             motor.name, motor.id, log);
+            std::abort();
         }
         spdlog::info("Successfully set OpMode to {} on motor {} (id = {})",
                      OpModeName(motor.op_mode), motor.name, motor.id);
@@ -313,7 +297,7 @@ WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_
         FlashEEPROM(&dxl_wb_, profile_);
     }
     CalibrateShadowOrDie(&dxl_wb_, profile_);
-    SetCurrentLimit(&dxl_wb_, &profile_);
+    SetControlMode(&dxl_wb_, &profile_);
 
     // Now torque back on.
     TorqueOn();
@@ -422,13 +406,17 @@ std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
 }
 
 std::vector<float> WxArmorDriver::GetSafetyCurrentLimits() {
+    // If the current limit (effectively torque limit) is set to a non-zero
+    // value, we will use that as our software-based current limit.
+    // If it left at 0, a default value of 1200 will be used instead.
     std::vector<float> safety_current_limits;
-
     for (const auto& motor : profile_.motors) {
         float limit = motor.current_limit;
         if (limit < 1) {
             limit = 1200;
         }
+        spdlog::info("Motor {} (id = {}) set current limit set to {}.", motor.name, motor.id,
+                     limit);
         safety_current_limits.push_back(limit);
     }
     return safety_current_limits;
