@@ -108,6 +108,7 @@ struct RobotProfile
 {
     std::vector<MotorInfo> motors{};
     std::vector<uint8_t> joint_ids{};
+    std::vector<uint8_t> motor_ids{};
     std::vector<std::string> joint_names{};
     std::vector<RegistryKV> eeprom{};
 

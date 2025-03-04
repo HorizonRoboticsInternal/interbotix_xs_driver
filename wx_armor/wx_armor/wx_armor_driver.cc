@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <thread>
 
+#include "spdlog/fmt/ranges.h"  // For container formatting
 #include "spdlog/spdlog.h"
 
 namespace fs = std::filesystem;
@@ -343,14 +344,19 @@ bool WxArmorDriver::MotorHealthCheck() {
 
 std::optional<SensorData> WxArmorDriver::Read() {
     static uint64_t error_count = 0;
-    std::vector<int32_t> buffer(profile_.joint_ids.size());
-    const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
+    std::vector<int32_t> joint_buffer(profile_.joint_ids.size());
+    std::vector<int32_t> motor_buffer(profile_.motors.size());
+    const uint8_t num_joints = static_cast<uint8_t>(joint_buffer.size());
+    const uint8_t num_motors = static_cast<uint8_t>(motor_buffer.size());
+
+    spdlog::info("{}", profile_.joint_ids);
+    exit(0);
 
     SensorData result = SensorData{
         .pos = std::vector<float>(num_joints),
         .vel = std::vector<float>(num_joints),
         .crt = std::vector<float>(num_joints),
-        .err = std::vector<int32_t>(num_joints),
+        .err = std::vector<int32_t>(num_motors),
     };
 
     std::unique_lock<std::mutex> handler_lock{io_mutex_};
@@ -378,13 +384,13 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
     if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
                                  read_position_address_.address, read_position_address_.data_length,
-                                 buffer.data(), &log)) {
+                                 joint_buffer.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (position): {}", log);
         std::abort();
     }
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-        result.pos[i] = dxl_wb_.convertValue2Radian(profile_.joint_ids[i], buffer[i]);
+        result.pos[i] = dxl_wb_.convertValue2Radian(profile_.joint_ids[i], joint_buffer[i]);
         spdlog::info("Position of joint {} is {}", profile_.joint_ids[i], result.pos[i]);
     }
 
@@ -392,27 +398,27 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
     if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
                                  read_velocity_address_.address, read_velocity_address_.data_length,
-                                 buffer.data(), &log)) {
+                                 joint_buffer.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (velocity): {}", log);
         std::abort();
     }
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-        result.vel[i] = dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], buffer[i]);
+        result.vel[i] = dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], joint_buffer[i]);
     }
 
     // 3. Extract Current
 
     if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
                                  read_current_address_.address, read_current_address_.data_length,
-                                 buffer.data(), &log)) {
+                                 joint_buffer.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (current): {}", log);
         std::abort();
     }
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-        spdlog::info("Current for joint {} is {}", i, buffer[i]);
-        result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
+        spdlog::info("Current for joint {} is {}", i, joint_buffer[i]);
+        result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], joint_buffer[i]);
         spdlog::info("Current [mA] for joint {} is {}", i, result.crt[i]);
     }
 
