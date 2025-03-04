@@ -358,7 +358,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
     std::unique_lock<std::mutex> handler_lock{io_mutex_};
     const char* log;
 
-    if (!dxl_wb_.syncRead(read_handler_index_, profile_.joint_ids.data(), num_joints, &log)) {
+    if (!dxl_wb_.syncRead(read_handler_index_, profile_.motor_ids.data(), num_motors, &log)) {
         if (error_count % 1000 == 0) {
             spdlog::warn("Failed to syncRead: {}", log);
         }
