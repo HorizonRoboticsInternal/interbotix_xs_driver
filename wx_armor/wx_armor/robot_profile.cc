@@ -13,6 +13,7 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(const Node& node,
     for (const auto& child : node["motors"]) {
         YAML::Node info = child.second;
         uint8_t motor_id = info["ID"].as<uint8_t>();
+        profile.motor_ids.emplace_back(motor_id);
 
         // Safety velocity limit is given in [deg/s]. Convert it to [rad/s]
         float safety_vel_limit = info["Safety_Velocity_Limit"].as<float>();

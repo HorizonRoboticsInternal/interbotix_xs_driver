@@ -5,7 +5,6 @@
 #include <cstdlib>
 #include <thread>
 
-#include "spdlog/fmt/ranges.h"  // For container formatting
 #include "spdlog/spdlog.h"
 
 namespace fs = std::filesystem;
@@ -349,13 +348,10 @@ std::optional<SensorData> WxArmorDriver::Read() {
     const uint8_t num_joints = static_cast<uint8_t>(joint_buffer.size());
     const uint8_t num_motors = static_cast<uint8_t>(motor_buffer.size());
 
-    spdlog::info("{}", profile_.joint_ids);
-    exit(0);
-
     SensorData result = SensorData{
         .pos = std::vector<float>(num_joints),
         .vel = std::vector<float>(num_joints),
-        .crt = std::vector<float>(num_joints),
+        .crt = std::vector<float>(num_motors),
         .err = std::vector<int32_t>(num_motors),
     };
 
@@ -409,29 +405,29 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
     // 3. Extract Current
 
-    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
+    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.motor_ids.data(), num_motors,
                                  read_current_address_.address, read_current_address_.data_length,
-                                 joint_buffer.data(), &log)) {
+                                 motor_buffer.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (current): {}", log);
         std::abort();
     }
 
-    for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-        spdlog::info("Current for joint {} is {}", i, joint_buffer[i]);
-        result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], joint_buffer[i]);
-        spdlog::info("Current [mA] for joint {} is {}", i, result.crt[i]);
+    for (size_t i = 0; i < profile_.motor_ids.size(); ++i) {
+        spdlog::info("Current for motor {} is {}", i, motor_buffer[i]);
+        result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], motor_buffer[i]);
+        spdlog::info("Current [mA] for motor {} is {}", i, result.crt[i]);
     }
 
     // 4. Extract Error
-    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
+    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.motor_ids.data(), num_motors,
                                  read_error_address_.address, read_error_address_.data_length,
                                  result.err.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (hardware error): {}", log);
         std::abort();
     }
 
-    for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-        spdlog::info("hardware error for joint {} is {}", i, result.err[i]);
+    for (size_t i = 0; i < profile_.motor_ids.size(); ++i) {
+        spdlog::info("hardware error for motor {} is {}", i, result.err[i]);
     }
 
     return std::move(result);
