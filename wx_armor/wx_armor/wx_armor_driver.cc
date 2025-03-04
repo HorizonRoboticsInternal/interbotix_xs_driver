@@ -385,6 +385,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
         result.pos[i] = dxl_wb_.convertValue2Radian(profile_.joint_ids[i], buffer[i]);
+        spdlog::info("Position of joint {} is {}", profile_.joint_ids[i], result.pos[i]);
     }
 
     // 2. Extract Velocity
