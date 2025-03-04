@@ -350,7 +350,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
         .pos = std::vector<float>(num_joints),
         .vel = std::vector<float>(num_joints),
         .crt = std::vector<float>(num_joints),
-        .err = std::vector<uint32_t>(num_joints),
+        .err = std::vector<int32_t>(num_joints),
     };
 
     std::unique_lock<std::mutex> handler_lock{io_mutex_};
@@ -412,6 +412,19 @@ std::optional<SensorData> WxArmorDriver::Read() {
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
         spdlog::info("Current for joint {} is {}", i, buffer[i]);
         result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
+        spdlog::info("Current [mA] for joint {} is {}", i, result.crt[i]);
+    }
+
+    // 4. Extract Error
+    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
+                                 read_error_address_.address, read_error_address_.data_length,
+                                 result.err.data(), &log)) {
+        spdlog::critical("Cannot getSyncReadData (hardware error): {}", log);
+        std::abort();
+    }
+
+    for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+        spdlog::info("hardware error for joint {} is {}", i, result.err[i]);
     }
 
     return std::move(result);

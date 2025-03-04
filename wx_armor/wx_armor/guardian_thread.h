@@ -90,7 +90,7 @@ class GuardianThread
     // bit 9 is for command delta too large,
     // bit 10 is joint velocity limit violation,
     // bit 11 is joint over current limit violation,
-    std::vector<uint32_t> error_codes_{};
+    std::vector<int32_t> error_codes_{};
 };
 
 }  // namespace horizon::wx_armor

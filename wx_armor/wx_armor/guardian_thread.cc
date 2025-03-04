@@ -153,7 +153,7 @@ const SensorData GuardianThread::GetCachedSensorData() {
 
 void GuardianThread::ResetErrorCodes() {
     std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-    for (uint32_t& error_code : error_codes_) {
+    for (int32_t& error_code : error_codes_) {
         error_code = 0;
     }
     Driver()->ResetSafetyViolationMode();

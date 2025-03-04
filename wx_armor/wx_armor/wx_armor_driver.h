@@ -65,10 +65,10 @@ struct SensorData
     // │ Per Joint        │
     // └──────────────────┘
 
-    std::vector<float> pos{};     // joint position
-    std::vector<float> vel{};     // joint velocity
-    std::vector<float> crt{};     // motor electric current of this joint
-    std::vector<uint32_t> err{};  // per joint error codes
+    std::vector<float> pos{};    // joint position
+    std::vector<float> vel{};    // joint velocity
+    std::vector<float> crt{};    // motor electric current of this joint
+    std::vector<int32_t> err{};  // per joint error codes
 
     // ┌──────────────────┐
     // │ Metadata         │
