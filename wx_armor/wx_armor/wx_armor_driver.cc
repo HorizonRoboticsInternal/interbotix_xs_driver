@@ -345,8 +345,8 @@ std::optional<SensorData> WxArmorDriver::Read() {
     static uint64_t error_count = 0;
     std::vector<int32_t> joint_buffer(profile_.joint_ids.size());
     std::vector<int32_t> motor_buffer(profile_.motors.size());
-    const uint8_t num_joints = static_cast<uint8_t>(joint_buffer.size());
-    const uint8_t num_motors = static_cast<uint8_t>(motor_buffer.size());
+    const auto num_joints = static_cast<uint8_t>(joint_buffer.size());
+    const auto num_motors = static_cast<uint8_t>(motor_buffer.size());
 
     SensorData result = SensorData{
         .pos = std::vector<float>(num_joints),
@@ -387,7 +387,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
         result.pos[i] = dxl_wb_.convertValue2Radian(profile_.joint_ids[i], joint_buffer[i]);
-        spdlog::info("Position of joint {} is {}", profile_.joint_ids[i], result.pos[i]);
+        // spdlog::info("Position of joint {} is {}", profile_.joint_ids[i], result.pos[i]);
     }
 
     // 2. Extract Velocity
@@ -426,9 +426,9 @@ std::optional<SensorData> WxArmorDriver::Read() {
         std::abort();
     }
 
-    for (size_t i = 0; i < profile_.motor_ids.size(); ++i) {
-        spdlog::info("hardware error for motor {} is {}", i, result.err[i]);
-    }
+    // for (size_t i = 0; i < profile_.motor_ids.size(); ++i) {
+    //     spdlog::info("hardware error for motor {} is {}", i, result.err[i]);
+    // }
 
     return std::move(result);
 }
