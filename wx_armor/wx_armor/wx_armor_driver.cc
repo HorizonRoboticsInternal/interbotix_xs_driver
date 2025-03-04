@@ -248,6 +248,15 @@ void SetCurrentLimit(DynamixelWorkbench* dxl_wb, RobotProfile* profile) {
         spdlog::info("Successfully set OpMode to {} on motor {} (id = {})",
                      OpModeName(motor.op_mode), motor.name, motor.id);
     }
+    for (MotorInfo& motor : profile->motors) {
+        int32_t current_limit;
+        dxl_wb->itemRead(motor.id, "Current_Limit", &current_limit);
+        spdlog::info("Current limit for motor {} (id = {}) is {}.", motor.name, motor.id,
+                     current_limit);
+        dxl_wb->itemRead(motor.id, "Goal_Current", &current_limit);
+        spdlog::info("Goal current for motor {} (id = {}) is {}.", motor.name, motor.id,
+                     current_limit);
+    }
 }
 
 // Check all the motors and see whether there are motors in error state. If so,
