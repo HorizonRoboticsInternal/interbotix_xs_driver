@@ -410,6 +410,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
     }
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+        spdlog::info("Current for joint {} is {}", i, buffer[i]);
         result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
     }
 
