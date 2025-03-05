@@ -79,13 +79,13 @@ GuardianThread::GuardianThread() {
                 }
 
                 // if hardware error is detected, trigger safety violation mode
-                if (sensor_data.value().err.size() > 0) {
-                    for (const auto& error_code : sensor_data.value().err) {
-                        if (error_code != 0) {
-                            Driver()->TriggerSafetyViolationMode();
-                            break;
-                        }
+                int motor_id = 0;
+                for (const auto& error_code : sensor_data.value().err) {
+                    if (error_code != 0) {
+                        Driver()->TriggerSafetyViolationMode();
+                        SetErrorCode(motor_id, error_code);
                     }
+                    motor_id++;
                 }
 
                 // GuardianThread also has the dual role of monitoring for

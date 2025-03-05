@@ -127,12 +127,12 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, fl
         }
     }
     Driver()->SetPosition(cmd, moving_time);
-    if (!Driver()->SafetyViolationTriggered() && !Driver()->MotorHealthCheck()) {
-        Driver()->TriggerSafetyViolationMode();
-        guardian_thread_.SetErrorCode(0, GuardianThread::kErrorMotorNotReachable);
-        SlowDownToStop(readings);
-        return;
-    }
+    //    if (!Driver()->SafetyViolationTriggered() && !Driver()->MotorHealthCheck()) {
+    //        Driver()->TriggerSafetyViolationMode();
+    //        guardian_thread_.SetErrorCode(0, GuardianThread::kErrorMotorNotReachable);
+    //        SlowDownToStop(readings);
+    //        return;
+    //    }
 }
 
 }  // namespace horizon::wx_armor
