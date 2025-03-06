@@ -69,6 +69,8 @@ shadows:
 
 sisters:
 
+current_limit: &current_value 500
+
 motors:
   waist:
     ID: 1
@@ -76,7 +78,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 500
+    Current_Limit: *current_value
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
@@ -90,7 +92,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: *current_value
     Min_Position_Limit: 819
     Max_Position_Limit: 3345
     Secondary_ID: 255
@@ -104,7 +106,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 5
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: *current_value
     Min_Position_Limit: 819
     Max_Position_Limit: 3345
     Secondary_ID: 2
@@ -118,7 +120,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: *current_value
     Min_Position_Limit: 648
     Max_Position_Limit: 3094
     Secondary_ID: 255
@@ -132,7 +134,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 5
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: *current_value
     Min_Position_Limit: 648
     Max_Position_Limit: 3094
     Secondary_ID: 4
@@ -146,7 +148,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: *current_value
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
@@ -160,7 +162,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 5
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: *current_value
     Min_Position_Limit: 910
     Max_Position_Limit: 3447
     Secondary_ID: 255
@@ -178,7 +180,7 @@ motors:
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
-    Position_P_Gain: 500
+    Position_P_Gain: 400
     Position_D_Gain: 0
     Safety_Velocity_Limit: 1000
 

@@ -259,30 +259,58 @@ void SetCurrentLimit(DynamixelWorkbench* dxl_wb, RobotProfile* profile) {
     }
 }
 
+//// Check all the motors and see whether there are motors in error state. If so,
+//// that motor is rebooted. This function is called at initialization.
+//void RebootMotorIfInErrorState(DynamixelWorkbench* dxl_wb, const RobotProfile& profile) {
+//    const char* log;
+//    int32_t value = 0;
+//    for (const MotorInfo& motor : profile.motors) {
+//        bool success = dxl_wb->itemRead(motor.id, "Hardware_Error_Status", &value, &log);
+//
+//        if (success && value == 0) {
+//            continue;
+//        }
+//        else if (dxl_wb->reboot(motor.id, &log)) {
+//            spdlog::info("Motor {} '{}' was in error state, and is rebooted.", motor.id,
+//                         motor.name);
+//        }
+//        else {
+//            spdlog::critical("Motor {} '{}' was in error state, but fail to reboot it: {}",
+//                             motor.id, motor.name, log);
+//            std::abort();
+//        }
+//    }
+//}
+
+}  // namespace
+
 // Check all the motors and see whether there are motors in error state. If so,
 // that motor is rebooted. This function is called at initialization.
-void RebootMotorIfInErrorState(DynamixelWorkbench* dxl_wb, const RobotProfile& profile) {
+void WxArmorDriver::RebootMotorIfInErrorState() {
     const char* log;
     int32_t value = 0;
-    for (const MotorInfo& motor : profile.motors) {
-        bool success = dxl_wb->itemRead(motor.id, "Hardware_Error_Status", &value, &log);
+    std::unique_lock<std::mutex> handler_lock{io_mutex_};
+    for (const MotorInfo& motor : profile_.motors) {
+        bool success = dxl_wb_.itemRead(motor.id, "Hardware_Error_Status", &value, &log);
+
+        spdlog::info("IN REBOOT");
 
         if (success && value == 0) {
             continue;
         }
-        else if (dxl_wb->reboot(motor.id, &log)) {
-            spdlog::info("Motor {} '{}' was in error state, and is rebooted.", motor.id,
-                         motor.name);
-        }
-        else {
-            spdlog::critical("Motor {} '{}' was in error state, but fail to reboot it: {}",
-                             motor.id, motor.name, log);
-            std::abort();
-        }
+        dxl_wb_.reboot(motor.id, &log);
+//        else if (dxl_wb_.reboot(motor.id, &log)) {
+//            spdlog::info("Motor {} '{}' was in error state, and is rebooted.", motor.id,
+//                         motor.name);
+//        }
+//        else {
+//            spdlog::critical("Motor {} '{}' was in error state, but fail to reboot it: {}",
+//                             motor.id, motor.name, log);
+//            std::abort();
+//        }
     }
 }
 
-}  // namespace
 
 WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_path,
                              bool flash_eeprom)
@@ -313,7 +341,7 @@ WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_
     // on.
     TorqueOff();
 
-    RebootMotorIfInErrorState(&dxl_wb_, profile_);
+//    RebootMotorIfInErrorState(&dxl_wb_, profile_);
     if (flash_eeprom) {
         // Note that FlashEEPROM performs "write-on-diff", meaning that it will
         // not write if the desired value and current value are the same. This
@@ -359,6 +387,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
     const char* log;
 
     if (!dxl_wb_.syncRead(read_handler_index_, profile_.motor_ids.data(), num_motors, &log)) {
+//    if (!dxl_wb_.syncRead(read_handler_index_, profile_.joint_ids.data(), num_joints, &log)) {
         if (error_count % 1000 == 0) {
             spdlog::warn("Failed to syncRead: {}", log);
         }
@@ -387,7 +416,7 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
         result.pos[i] = dxl_wb_.convertValue2Radian(profile_.joint_ids[i], joint_buffer[i]);
-        // spdlog::info("Position of joint {} is {}", profile_.joint_ids[i], result.pos[i]);
+//         spdlog::info("Position of joint {} is {}", profile_.joint_ids[i], result.pos[i]);
     }
 
     // 2. Extract Velocity
@@ -400,7 +429,14 @@ std::optional<SensorData> WxArmorDriver::Read() {
     }
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+//        spdlog::info("velocity of joint {} is {}", profile_.joint_ids[i], joint_buffer[i]);
         result.vel[i] = dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], joint_buffer[i]);
+//        spdlog::info("conv velocity of joint {} is {}", profile_.joint_ids[i], result.vel[i]);
+//        if (joint_buffer[i] > 32767) {
+//            joint_buffer[i] = (65536 - joint_buffer[i]) * -1;
+//        }
+//        result.vel[i] = dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], joint_buffer[i]);
+//        spdlog::info("2s comp conv velocity of joint {} is {}", profile_.joint_ids[i], result.vel[i]);
     }
 
     // 3. Extract Current
@@ -408,14 +444,38 @@ std::optional<SensorData> WxArmorDriver::Read() {
     if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.motor_ids.data(), num_motors,
                                  read_current_address_.address, read_current_address_.data_length,
                                  motor_buffer.data(), &log)) {
+//    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
+//                                 read_current_address_.address, read_current_address_.data_length,
+//                                 joint_buffer.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (current): {}", log);
         std::abort();
     }
 
+//    for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
+//    // https://forum.robotis.com/t/how-can-i-measure-current-in-an-operating-dynamixel/5825/5
+//        if (joint_buffer[i] > 32767) {
+//            joint_buffer[i] = (65536 - joint_buffer[i]) * -1motor_buffer.data();
+//        }
+//
+//        spdlog::info("Current for motor {} is {}", profile_.joint_ids[i], joint_buffer[i]);
+//        result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], joint_buffer[i]);
+//        spdlog::info("Current [mA] for motor {} is {}", profile_.joint_ids[i], result.crt[i]);
+//
+////        int32_t curr_val;
+////        dxl_wb_.itemRead(profile_.joint_ids[i], "Present_Current", &curr_val);
+////        spdlog::info("Current comp for motor {} is {}", profile_.joint_ids[i], curr_val);
+//// https://forum.robotis.com/t/how-can-i-measure-current-in-an-operating-dynamixel/5825/5
+//    }
+//    spdlog::info("==========================");
     for (size_t i = 0; i < profile_.motor_ids.size(); ++i) {
         spdlog::info("Current for motor {} is {}", i, motor_buffer[i]);
-        result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], motor_buffer[i]);
-        spdlog::info("Current [mA] for motor {} is {}", i, result.crt[i]);
+        result.crt[i] = dxl_wb_.convertValue2Current(profile_.motor_ids[i], motor_buffer[i]);
+        spdlog::info("Current1 [mA] for motor {} is {}", i, result.crt[i]);
+        if (motor_buffer[i] > 32767) {
+            motor_buffer[i] = (65536 - motor_buffer[i]) * -1;
+        }
+        result.crt[i] = dxl_wb_.convertValue2Current(profile_.motor_ids[i], motor_buffer[i]);
+        spdlog::info("Current2 [mA] for motor {} is {}", i, result.crt[i]);
     }
 
     // 4. Extract Error

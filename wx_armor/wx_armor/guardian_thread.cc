@@ -105,7 +105,7 @@ GuardianThread::GuardianThread() {
                     }
                 }
 
-                // Check for current limit violations
+//                 Check for current limit violations
                 std::vector<float> curr_currents = sensor_data.value().crt;
                 for (int i = 0; i < curr_currents.size(); i++) {
                     float cc = fabs(curr_currents[i]);

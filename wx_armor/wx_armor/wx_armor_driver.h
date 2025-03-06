@@ -275,6 +275,8 @@ class WxArmorDriver
         return profile_;
     }
 
+    void RebootMotorIfInErrorState();
+
   private:
     ControlItem AddItemToRead(const std::string& name);
 

@@ -34,6 +34,8 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
         return false;
     };
 
+    spdlog::info("{}", message);
+
     if (type != WebSocketMessageType::Text) {
         // This happens during keepalive or closing connection, ignored
     }
@@ -42,7 +44,7 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
         // motors
         spdlog::error("SETPID ignored.  Cannot read");
     }
-    else if (Driver()->SafetyViolationTriggered() && !Match("SETPID") && !Match("MOVETO")) {
+    else if (Driver()->SafetyViolationTriggered() && !Match("SETPID") && !Match("MOVETO") && !Match("REBOOT")) {
         // If safety violation is triggered, ignore all commands except SETPID
         // which resets error status, and MOVETO which allows the client to set
         // the jointpos command to the current position to avoid jumps after
@@ -85,6 +87,10 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
     }
     else if (Match("TORQUE OFF")) {
         Driver()->TorqueOff();
+    }
+    else if (Match("REBOOT")) {
+        spdlog::info("Reboot?");
+        Driver()->RebootMotorIfInErrorState();
     }
     else if (Match("SETPID")) {
         std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
