@@ -24,9 +24,10 @@ GuardianThread::GuardianThread() {
                     // If we have an error, we still want to publish the error
                     // codes
                     static const uint8_t num_joints = Driver()->Profile().joint_ids.size();
+                    static const uint8_t num_motors = Driver()->Profile().joint_ids.size();
                     sensor_data = SensorData{.pos = std::vector<float>(num_joints),
                                              .vel = std::vector<float>(num_joints),
-                                             .crt = std::vector<float>(num_joints),
+                                             .crt = std::vector<float>(num_motors),
                                              .err = error_codes_,
                                              .timestamp = -1};
                 }
@@ -78,25 +79,29 @@ GuardianThread::GuardianThread() {
                     logged = false;
                 }
 
-                // if hardware error is detected, trigger safety violation mode
-                if (sensor_data.value().err.size() > 0) {
-                    for (const auto& error_code : sensor_data.value().err) {
-                        if (error_code != 0) {
-                            Driver()->TriggerSafetyViolationMode();
-                            break;
-                        }
+                // If hardware error is detected, trigger safety violation mode
+                size_t idx = 0;
+                for (const auto& error_code : sensor_data.value().err) {
+                    if (error_code != 0) {
+                        Driver()->TriggerSafetyViolationMode();
+                        SetErrorCode(idx, error_code);
                     }
+                    idx++;
                 }
 
-                // GuardianThread also has the dual role of monitoring for
-                // safety e.g., checking for velocity limit violations
+                // GuardianThread also has the dual role of monitoring for safety
+                // via some software-based checks.
+
+                // Check for velocity limit violations for each joint.
                 std::vector<float> curr_velocities = sensor_data.value().vel;
                 for (int i = 0; i < curr_velocities.size(); i++) {
                     float cv = fabs(curr_velocities[i]);
                     float limit = safety_velocity_limits[i];
                     if (cv > limit) {
                         Driver()->TriggerSafetyViolationMode();
-                        SetErrorCode(i, kErrorVelocityLimitViolation);
+                        // Make sure to set is_joint_idx to True since velocities are reported
+                        // at the joint level.
+                        SetErrorCode(i, kErrorVelocityLimitViolation, true);
                         if (!logged)
                             spdlog::error("Guardian thread detected velocity limit "
                                           "violation for motor "
@@ -105,15 +110,13 @@ GuardianThread::GuardianThread() {
                     }
                 }
 
-                // Check for current limit violations
+                // Check for current limit violations for each motor.
                 std::vector<float> curr_currents = sensor_data.value().crt;
                 for (int i = 0; i < curr_currents.size(); i++) {
                     float cc = fabs(curr_currents[i]);
                     float limit = safety_current_limits[i];
                     if (cc > limit) {
                         Driver()->TriggerSafetyViolationMode();
-                        // Set error_code_ to 1 for the motor that violated the
-                        // limit
                         SetErrorCode(i, kErrorCurrentLimitViolation);
                         if (!logged)
                             spdlog::error("Guardian thread detected current limit "
@@ -153,15 +156,24 @@ const SensorData GuardianThread::GetCachedSensorData() {
 
 void GuardianThread::ResetErrorCodes() {
     std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-    for (uint32_t& error_code : error_codes_) {
+    for (int32_t& error_code : error_codes_) {
         error_code = 0;
     }
     Driver()->ResetSafetyViolationMode();
 }
 
-void GuardianThread::SetErrorCode(uint8_t motor_id, uint32_t error_code) {
+void GuardianThread::SetErrorCode(uint8_t motor_idx, int32_t error_code, bool is_joint_idx) {
     std::unique_lock<std::mutex> cache_lock{cache_mutex_};
-    error_codes_[motor_id] |= error_code;
+    size_t idx = motor_idx;
+    if (is_joint_idx) {
+        if (motor_idx > 1) {
+            idx++;
+        }
+        if (motor_idx > 3) {
+            idx++;
+        }
+    }
+    error_codes_[idx] |= error_code;
 }
 
 GuardianThread::~GuardianThread() {

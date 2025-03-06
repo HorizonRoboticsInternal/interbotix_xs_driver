@@ -325,29 +325,24 @@ WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_
 WxArmorDriver::~WxArmorDriver() {
 }
 
-bool WxArmorDriver::MotorHealthCheck() {
-    std::unique_lock<std::mutex> handler_lock{io_mutex_};
-    return PingMotors(&dxl_wb_, profile_,
-                      /* log_errors_only */ true,
-                      /* num_trials */ 1);
-}
-
 std::optional<SensorData> WxArmorDriver::Read() {
     static uint64_t error_count = 0;
-    std::vector<int32_t> buffer(profile_.joint_ids.size());
-    const uint8_t num_joints = static_cast<uint8_t>(buffer.size());
+    std::vector<int32_t> joint_buffer(profile_.joint_ids.size());
+    std::vector<int32_t> motor_buffer(profile_.motor_ids.size());
+    const auto num_joints = static_cast<uint8_t>(joint_buffer.size());
+    const auto num_motors = static_cast<uint8_t>(motor_buffer.size());
 
     SensorData result = SensorData{
         .pos = std::vector<float>(num_joints),
         .vel = std::vector<float>(num_joints),
-        .crt = std::vector<float>(num_joints),
-        .err = std::vector<uint32_t>(num_joints),
+        .crt = std::vector<float>(num_motors),
+        .err = std::vector<int32_t>(num_motors),
     };
 
     std::unique_lock<std::mutex> handler_lock{io_mutex_};
     const char* log;
 
-    if (!dxl_wb_.syncRead(read_handler_index_, profile_.joint_ids.data(), num_joints, &log)) {
+    if (!dxl_wb_.syncRead(read_handler_index_, profile_.motor_ids.data(), num_motors, &log)) {
         if (error_count % 1000 == 0) {
             spdlog::warn("Failed to syncRead: {}", log);
         }
@@ -369,39 +364,47 @@ std::optional<SensorData> WxArmorDriver::Read() {
 
     if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
                                  read_position_address_.address, read_position_address_.data_length,
-                                 buffer.data(), &log)) {
+                                 joint_buffer.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (position): {}", log);
         std::abort();
     }
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-        result.pos[i] = dxl_wb_.convertValue2Radian(profile_.joint_ids[i], buffer[i]);
+        result.pos[i] = dxl_wb_.convertValue2Radian(profile_.joint_ids[i], joint_buffer[i]);
     }
 
     // 2. Extract Velocity
 
     if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
                                  read_velocity_address_.address, read_velocity_address_.data_length,
-                                 buffer.data(), &log)) {
+                                 joint_buffer.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (velocity): {}", log);
         std::abort();
     }
 
     for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-        result.vel[i] = dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], buffer[i]);
+        result.vel[i] = dxl_wb_.convertValue2Velocity(profile_.joint_ids[i], joint_buffer[i]);
     }
 
     // 3. Extract Current
 
-    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
+    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.motor_ids.data(), num_motors,
                                  read_current_address_.address, read_current_address_.data_length,
-                                 buffer.data(), &log)) {
+                                 motor_buffer.data(), &log)) {
         spdlog::critical("Cannot getSyncReadData (current): {}", log);
         std::abort();
     }
 
-    for (size_t i = 0; i < profile_.joint_ids.size(); ++i) {
-        result.crt[i] = dxl_wb_.convertValue2Current(profile_.joint_ids[i], buffer[i]);
+    for (size_t i = 0; i < profile_.motor_ids.size(); ++i) {
+        result.crt[i] = dxl_wb_.convertValue2Current(profile_.motor_ids[i], motor_buffer[i]);
+    }
+
+    // 4. Extract Hardware errors
+    if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.motor_ids.data(), num_motors,
+                                 read_error_address_.address, read_error_address_.data_length,
+                                 result.err.data(), &log)) {
+        spdlog::critical("Cannot getSyncReadData (hardware error): {}", log);
+        std::abort();
     }
 
     return std::move(result);
@@ -413,7 +416,7 @@ std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
     int counter = 0;
     for (const auto& motor : profile_.motors) {
         // Skip the shadowed motors, which have IDs 3 and 5.
-        if (counter != 3 && counter != 5) {
+        if (counter != 2 && counter != 4) {
             safety_velocity_limits.push_back(motor.safety_vel_limit);
         }
         counter++;

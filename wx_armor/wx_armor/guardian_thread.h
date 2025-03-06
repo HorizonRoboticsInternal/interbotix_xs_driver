@@ -55,10 +55,10 @@ class GuardianThread
      */
     const SensorData GetCachedSensorData();
 
-    const static uint32_t kErrorCommandDeltaTooLarge = 1 << 9;
-    const static uint32_t kErrorVelocityLimitViolation = 1 << 10;
-    const static uint32_t kErrorCurrentLimitViolation = 1 << 11;
-    const static uint32_t kErrorMotorNotReachable = 1 << 12;
+    const static int32_t kErrorCommandDeltaTooLarge = 1 << 9;
+    const static int32_t kErrorVelocityLimitViolation = 1 << 10;
+    const static int32_t kErrorCurrentLimitViolation = 1 << 11;
+    const static int32_t kErrorMotorNotReachable = 1 << 12;
 
     /**
      * @brief Resets the error codes for all motors.
@@ -67,8 +67,14 @@ class GuardianThread
 
     /**
      * @brief Sets the error code for a specific motor.
+     *
+     * Args:
+     *     motor_idx: The motor index to set the error code for. Note that this is
+     *         an index and NOT the motor ID, which usually starts from 1.
+     *     error_code: The error code to set for the motor.
+     *     is_joint_idx: If True, will consider the motor_idx, a joint_idx and map accordingly.
      */
-    void SetErrorCode(uint8_t motor_id, uint32_t error_code);
+    void SetErrorCode(uint8_t motor_idx, int32_t error_code, bool is_joint_idx = false);
 
   private:
     std::mutex conns_mutex_;  // protects conns_
@@ -90,7 +96,7 @@ class GuardianThread
     // bit 9 is for command delta too large,
     // bit 10 is joint velocity limit violation,
     // bit 11 is joint over current limit violation,
-    std::vector<uint32_t> error_codes_{};
+    std::vector<int32_t> error_codes_{};
 };
 
 }  // namespace horizon::wx_armor
