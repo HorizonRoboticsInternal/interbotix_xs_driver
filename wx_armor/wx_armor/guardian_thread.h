@@ -57,7 +57,7 @@ class GuardianThread
 
     const static int32_t kErrorCommandDeltaTooLarge = 1 << 9;
     const static int32_t kErrorVelocityLimitViolation = 1 << 10;
-    const static int32_t kErrorCurrentLimitViolation = 1 << 11;
+    // const static int32_t kErrorCurrentLimitViolation = 1 << 11;  // unused
     const static int32_t kErrorMotorNotReachable = 1 << 12;
 
     /**

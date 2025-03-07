@@ -166,14 +166,6 @@ class WxArmorDriver
     std::vector<float> GetSafetyVelocityLimits();
 
     /**
-     * @brief Reads the safety current limits from RobotProfile and returns it.
-     *
-     * @return An array containing the safety current limits for each motor
-     * [mA].
-     */
-    std::vector<float> GetSafetyCurrentLimits();
-
-    /**
      * @brief Sets the position of the robot's joints, with a desired moving and
      * acceleration time.
      * @details If acc_time is zero, constant velocity is used.
