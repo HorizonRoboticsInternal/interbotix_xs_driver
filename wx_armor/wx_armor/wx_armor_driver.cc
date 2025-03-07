@@ -108,12 +108,6 @@ void FlashEEPROM(DynamixelWorkbench* dxl_wb, const RobotProfile& profile) {
     for (const RegistryKV& kv : profile.eeprom) {
         int32_t current_value = 0;
 
-        // Hacky fix for now... Probably a better way to handle this
-        // Safety_Velocity_Limit is our own custom param. Don't write it to
-        // EEPROM
-        if (kv.key == "Safety_Velocity_Limit" || kv.key == "Current_Limit") {
-            continue;
-        }
         dxl_wb->itemRead(kv.motor_id, kv.key.c_str(), &current_value);
 
         // The EEPROM on the motors has a limited number of writes during its
@@ -212,41 +206,62 @@ void CalibrateShadowOrDie(DynamixelWorkbench* dxl_wb, const RobotProfile& profil
 // limit. The XL-series motors will still be under "position control" mode.
 //
 // The WidowX 250s robotic arm has 7 XM-series motors and 2-XL series motors.
-void SetCurrentLimit(DynamixelWorkbench* dxl_wb, RobotProfile* profile) {
+void SetOpMode(DynamixelWorkbench* dxl_wb, RobotProfile* profile) {
     const char* log = nullptr;
 
     for (MotorInfo& motor : profile->motors) {
         std::string model_name = dxl_wb->getModelName(motor.id);
-        uint32_t current_limit = motor.current_limit;
 
-        // If the current limit (effectively torque limit) is set to a non-zero
-        // value, we should use current-based position controller as the
-        // operation mode, so that we can set current limit to the motor.
-        //
-        // There is one exception. If the motor is an XL series motor, it does
-        // support current-based position controller operation mode. In this
-        // case, we are still going to use the default position controller
-        // operation mode.
-        if (current_limit == 0 || model_name.substr(0, 2) == "XL") {
-            motor.op_mode = OpMode::POSITION;
+        int32_t curr_op_mode;
+        dxl_wb->itemRead(motor.id, "Operating_Mode", &curr_op_mode);
+        if (motor.op_mode == OpMode::POSITION) {
+
+            if (curr_op_mode == 3) {
+                spdlog::info("Motor {} is already position control. Skipping EEPROM write.",
+                             motor.id);
+                continue;
+            }
+
             if (!dxl_wb->setPositionControlMode(motor.id, &log)) {
                 spdlog::critical("Failed to set OpMode to POSITION on motor {} (id = {}): "
                                  "{}",
                                  motor.name, motor.id, log);
                 std::abort();
             }
+            spdlog::info("Successfully set OpMode to {} on motor {} (id = {})",
+                         OpModeName(motor.op_mode), motor.name, motor.id);
         }
-        else {
-            motor.op_mode = OpMode::CURRENT_BASED_POSITION;
-            if (!dxl_wb->currentBasedPositionMode(motor.id, current_limit, &log)) {
+        else if (motor.op_mode == OpMode::CURRENT_BASED_POSITION) {
+
+            // If the operating mode is already what we want, just write the goal current
+            // (non-eeprom).
+            if (curr_op_mode == 5) {
+                if (!dxl_wb->itemWrite(motor.id, "Goal_Current", motor.goal_current)) {
+                    spdlog::critical("Failed to set Goal_Current on motor {}", motor.name);
+                    std::abort();
+                }
+                spdlog::info("Motor {} is already current-based position control. "
+                             "Skipping EEPROM write for the operating mode. "
+                             "Goal_Current has been properly set to {}!",
+                             motor.id, motor.goal_current * 2.69f);
+                continue;
+            }
+
+            if (!dxl_wb->currentBasedPositionMode(motor.id, motor.goal_current, &log)) {
                 spdlog::critical("Failed to set OpMode to POSITION on motor {} (id = {}): "
                                  "{}",
                                  motor.name, motor.id, log);
                 std::abort();
             }
+            spdlog::info(
+                "Successfully set OpMode to {} on motor {} (id = {}) with goal current {} mA.",
+                OpModeName(motor.op_mode), motor.name, motor.id, motor.goal_current * 2.69f);
         }
-        spdlog::info("Successfully set OpMode to {} on motor {} (id = {})",
-                     OpModeName(motor.op_mode), motor.name, motor.id);
+        else {
+            spdlog::error("An invalid OpMode {} was given for motor {}.", OpModeName(motor.op_mode),
+                          motor.id);
+            std::abort();
+        }
     }
 }
 
@@ -313,7 +328,7 @@ WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_
         FlashEEPROM(&dxl_wb_, profile_);
     }
     CalibrateShadowOrDie(&dxl_wb_, profile_);
-    SetCurrentLimit(&dxl_wb_, &profile_);
+    SetOpMode(&dxl_wb_, &profile_);
 
     // Now torque back on.
     TorqueOn();
@@ -421,19 +436,6 @@ std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
         safety_velocity_limits.push_back(motor.safety_vel_limit);
     }
     return safety_velocity_limits;
-}
-
-std::vector<float> WxArmorDriver::GetSafetyCurrentLimits() {
-    std::vector<float> safety_current_limits;
-
-    for (const auto& motor : profile_.motors) {
-        float limit = motor.current_limit;
-        if (limit < 1) {
-            limit = 1200;
-        }
-        safety_current_limits.push_back(limit);
-    }
-    return safety_current_limits;
 }
 
 void WxArmorDriver::SetPosition(const std::vector<float>& position, float moving_time,
@@ -643,9 +645,8 @@ WxArmorDriver* Driver() {
     static std::unique_ptr<WxArmorDriver> driver = []() {
         std::string usb_port = GetEnv<std::string>("WX_ARMOR_USB_PORT", "/dev/ttyDXL");
         std::filesystem::path motor_config = GetEnv<std::filesystem::path>(
-            "WX_ARMOR_MOTOR_CONFIG",
-            std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "configs" /
-                "wx250s_motor_config.yaml");
+            "WX_ARMOR_MOTOR_CONFIG", std::filesystem::path(__FILE__).parent_path().parent_path() /
+                                         "configs" / "wx250s_motor_config.yaml");
         int flash_eeprom = true;
         return std::make_unique<WxArmorDriver>(usb_port, motor_config,
                                                static_cast<bool>(flash_eeprom));
