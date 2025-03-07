@@ -24,7 +24,7 @@ GuardianThread::GuardianThread() {
                     // If we have an error, we still want to publish the error
                     // codes
                     static const uint8_t num_joints = Driver()->Profile().joint_ids.size();
-                    static const uint8_t num_motors = Driver()->Profile().joint_ids.size();
+                    static const uint8_t num_motors = Driver()->Profile().motor_ids.size();
                     sensor_data = SensorData{.pos = std::vector<float>(num_joints),
                                              .vel = std::vector<float>(num_joints),
                                              .crt = std::vector<float>(num_motors),

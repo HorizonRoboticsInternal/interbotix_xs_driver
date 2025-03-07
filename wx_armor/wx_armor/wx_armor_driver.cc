@@ -413,13 +413,12 @@ std::optional<SensorData> WxArmorDriver::Read() {
 std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
     std::vector<float> safety_velocity_limits;
 
-    int counter = 0;
     for (const auto& motor : profile_.motors) {
         // Skip the shadowed motors, which have IDs 3 and 5.
-        if (counter != 2 && counter != 4) {
-            safety_velocity_limits.push_back(motor.safety_vel_limit);
+        if (motor.id == 3 || motor.id == 5) {
+            continue;
         }
-        counter++;
+        safety_velocity_limits.push_back(motor.safety_vel_limit);
     }
     return safety_velocity_limits;
 }
