@@ -34,37 +34,28 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
         return false;
     };
 
+    bool set_pid = Match("SETPID");
+    bool move_to = Match("MOVETO");
+    bool reboot = Match("REBOOT");
+
     if (type != WebSocketMessageType::Text) {
         // This happens during keepalive or closing connection, ignored
     }
-    else if (Match("SETPID") && !Driver()->Read().has_value()) {
+    else if (set_pid && !Driver()->Read().has_value()) {
         // Allow client to reset error status via SETPID only if driver can read
         // motors
         spdlog::error("SETPID ignored.  Cannot read");
     }
-    else if (!Match("SETPID") && !Match("MOVETO") && Driver()->SafetyViolationTriggered()) {
-        // If safety violation is triggered, ignore all commands except SETPID
-        // which resets error status, and MOVETO which allows the client to set
-        // the jointpos command to the current position to avoid jumps after
-        // SETPID.
+    else if (!set_pid && !move_to && !reboot && Driver()->SafetyViolationTriggered()) {
+        // If safety violation is triggered, ignore all commands except
+        // 1) SETPID which resets error status,
+        // 2) MOVETO which allows the client to set the jointpos command to the
+        //    current position to avoid jumps after SETPID, and
+        // 3) REBOOT which tells the driver to reboot faulted motors.
         spdlog::error("Call from message handler ignored. Safety violation was "
                       "encountered.");
     }
-    else if (Match("SETPOS")) {
-        // Update the states for bookkeeping purpose.
-        ClientState& state = conn->getContextRef<ClientState>();
-        state.engaging = true;
-        state.latest_healthy_time = std::chrono::system_clock::now();
-
-        // Relay the command to the driver.
-        nlohmann::json json = nlohmann::json::parse(payload);
-        std::vector<float> position(json.size());
-        for (size_t i = 0; i < json.size(); ++i) {
-            position[i] = json.at(i).get<float>();
-        }
-        CheckAndSetPosition(position, 0.0);
-    }
-    else if (Match("MOVETO")) {
+    else if (move_to) {
         // Update the states for bookkeeping purpose.
         ClientState& state = conn->getContextRef<ClientState>();
         state.engaging = true;
@@ -80,16 +71,33 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
         float moving_time = json.at(json.size() - 1).get<float>();
         CheckAndSetPosition(position, moving_time);
     }
+    else if (set_pid) {
+        std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
+        Driver()->SetPID(gain_cfgs);
+        guardian_thread_.ResetErrorCodes();
+    }
+    else if (reboot) {
+        Driver()->RebootMotors();
+    }
     else if (Match("TORQUE ON")) {
         Driver()->TorqueOn();
     }
     else if (Match("TORQUE OFF")) {
         Driver()->TorqueOff();
     }
-    else if (Match("SETPID")) {
-        std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
-        Driver()->SetPID(gain_cfgs);
-        guardian_thread_.ResetErrorCodes();
+    else if (Match("SETPOS")) {
+        // Update the states for bookkeeping purpose.
+        ClientState& state = conn->getContextRef<ClientState>();
+        state.engaging = true;
+        state.latest_healthy_time = std::chrono::system_clock::now();
+
+        // Relay the command to the driver.
+        nlohmann::json json = nlohmann::json::parse(payload);
+        std::vector<float> position(json.size());
+        for (size_t i = 0; i < json.size(); ++i) {
+            position[i] = json.at(i).get<float>();
+        }
+        CheckAndSetPosition(position, 0.0);
     }
 }
 
