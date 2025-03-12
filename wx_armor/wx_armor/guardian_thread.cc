@@ -169,7 +169,7 @@ void GuardianThread::SetErrorCode(uint8_t motor_idx, int32_t error_code, bool is
         if (motor_idx > 1) {
             idx++;
         }
-        if (motor_idx > 3) {
+        if (motor_idx > 2) {
             idx++;
         }
     }
