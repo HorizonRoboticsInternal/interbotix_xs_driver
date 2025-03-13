@@ -65,10 +65,10 @@ struct SensorData
     // │ Per Joint        │
     // └──────────────────┘
 
-    std::vector<float> pos{};     // joint position
-    std::vector<float> vel{};     // joint velocity
-    std::vector<float> crt{};     // motor electric current of this joint
-    std::vector<uint32_t> err{};  // per joint error codes
+    std::vector<float> pos{};    // joint position
+    std::vector<float> vel{};    // joint velocity
+    std::vector<float> crt{};    // motor electric current of this joint
+    std::vector<int32_t> err{};  // per joint error codes
 
     // ┌──────────────────┐
     // │ Metadata         │
@@ -156,13 +156,6 @@ class WxArmorDriver
      * if the read fails.
      */
     std::optional<SensorData> Read();
-
-    /**
-     * @brief Check that all motors are health.
-     *
-     * @return Returns true if all motors are reachable and false otherwise.
-     */
-    bool MotorHealthCheck();
 
     /**
      * @brief Reads the safety velocity limits from RobotProfile and returns it.
