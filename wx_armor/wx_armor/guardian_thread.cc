@@ -12,6 +12,7 @@ namespace horizon::wx_armor
 GuardianThread::GuardianThread() {
     thread_ = std::jthread([this]() {
         std::vector<float> safety_velocity_limits = Driver()->GetSafetyVelocityLimits();
+        std::vector<float> safety_current_limits = Driver()->GetSafetyCurrentLimits();
         bool logged = false;
         while (!shutdown_.load()) {
             // Read the sensor data
@@ -106,6 +107,22 @@ GuardianThread::GuardianThread() {
                                           "violation for motor "
                                           "{}. Current velocity: {}, Limit: {}",
                                           i, cv, limit);
+                    }
+                }
+
+                // Check for current limit violations for each motor.
+                std::vector<float> curr_currents = sensor_data.value().crt;
+                for (int i = 0; i < curr_currents.size(); i++) {
+                    float cc = fabs(curr_currents[i]);
+                    float limit = safety_current_limits[i];
+                    if (cc > limit) {
+                        Driver()->TriggerSafetyViolationMode();
+                        SetErrorCode(i, kErrorCurrentLimitViolation);
+                        if (!logged)
+                            spdlog::error("Guardian thread detected current limit"
+                                          "violation for motor "
+                                          "{}. Current current: {}, Limit: {}",
+                                          i, cc, limit);
                     }
                 }
             }

@@ -78,6 +78,11 @@ struct MotorInfo
     // Note that only XM motors support OpMode::CURRENT_BASED_POSITION.
     uint32_t goal_current = 0;
 
+    // The current limit. Generally, this value will never be reached
+    // if operating in current-based position control mode. For position control
+    // mode, if this current is reached, a software-based error will trigger.
+    uint32_t current_limit = 0;
+
     // The safety velocity limit in [rad/s]
     float safety_vel_limit = M_PI / 2;
 };

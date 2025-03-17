@@ -42,6 +42,7 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(const Node& node,
                       // By default, set the operation mode to position control.
                       .op_mode = op_mode,
                       .goal_current = goal_current,
+                      .current_limit = info["Current_Limit"].as<uint32_t>(),
                       .safety_vel_limit = safety_vel_limit});
 
         // Now, populate the register table.

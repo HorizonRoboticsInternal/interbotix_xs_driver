@@ -117,6 +117,11 @@ void FlashEEPROM(DynamixelWorkbench* dxl_wb, const RobotProfile& profile) {
             continue;
         }
 
+        // The XL motors do not have a Current_Limit register.
+        if ((kv.motor_id == 8 || kv.motor_id == 9) && (kv.key == "Current_Limit" )) {
+            continue;
+        }
+
         if (!dxl_wb->itemWrite(kv.motor_id, kv.key.c_str(), kv.value, &log)) {
             spdlog::error("Failed to flash EEPROM for key value pair ({}, {}) on motor "
                           "ID = "
@@ -436,6 +441,17 @@ std::vector<float> WxArmorDriver::GetSafetyVelocityLimits() {
         safety_velocity_limits.push_back(motor.safety_vel_limit);
     }
     return safety_velocity_limits;
+}
+
+std::vector<float> WxArmorDriver::GetSafetyCurrentLimits() {
+    std::vector<float> safety_current_limits;
+
+    // Here we will get the safety current limits in mA.
+    for (const auto& motor : profile_.motors) {
+        float limit = motor.current_limit * 2.69f;
+        safety_current_limits.push_back(limit);
+    }
+    return safety_current_limits;
 }
 
 void WxArmorDriver::SetPosition(const std::vector<float>& position, float moving_time,

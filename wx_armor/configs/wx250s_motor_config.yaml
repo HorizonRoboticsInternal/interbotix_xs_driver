@@ -22,10 +22,17 @@
 #                                    the motor to operate in current-based position control mode with the specified goal current.
 #                                    This value must be less than or equal to Current_Limit. Look below for the conversion.
 #                                    Only applicable to XM-series motors.
-#   7) Current_Limit.................Defines the current limit [0-1193] of the motor before triggering an overload.
+#   7) Current_Limit.................Defines the maximum current allowed [0-1193] of the motor.
 #                                    This value must be greater than or equal to Goal_Current. The conversion for this
 #                                    value is 2.69 mA. In other words, a maximum of ~3.2 A is possible.
-#                                    Only applicable to XM-series motors.
+#                                    Note that the effect of this value changes depending on the control mode and motor type.
+#                                    Only XM-series motors officially have this register, so we will avoid writing it to the
+#                                    XL-series ones. In position control mode, this value is unused. In current-based position
+#                                    control mode, this value is used as the maximum current allowed. Since the Goal_Current
+#                                    value is always less than or equal to this value, this value is generally unused as well.
+#                                    What we do use this value for is to initiate a software-based error if the current of a
+#                                    motor ever exceeds this value. Again, note that this should only ever happen under position
+#                                    control mode since in current-based position control mode, the Goal_Current < Current_Limit.
 #   8) Min_Position_Limit............Defines the minimum limit of a joint. Values range from 0 to 4095 with 2048
 #                                    being equivalent to '0' rad and 0 being '-PI' rad.
 #   9) Max_Position_Limit............Defines the maximum limit of a joint. Values range from 0 to 4095 with 2048
@@ -37,7 +44,8 @@
 #                                    this limit, we override the current policy and attempt to slowly decelerate to a stop.
 #                                    Note that the max speed of the WidowX is extremely high at 24.5 radians per second.
 #                                    Only applicable to non-shadow motors. Shadow motors will use the same value as their
-#                                    master motor.
+#                                    master motor. Note that this is NOT an official register defined by Dynamixel. Therefore,
+#                                    we will avoid writing it to the register.
 #
 # Each motor's configs are grouped under the name of the joint the motor is controlling. The names are defined at
 # http://support.interbotix.com/ under the 'Specifications' section. (Click a robot and scroll down to the 'Default Joint Limits' section.)
@@ -73,7 +81,7 @@ shadows:
 sisters:
 
 # Users can override this default value for goal current for all XM-motors.
-goal_current: &goal_current_value 500
+goal_current: &goal_current_value 800
 
 motors:
   waist:
@@ -186,6 +194,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
+    Current_Limit: 800
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
@@ -199,6 +208,7 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
+    Current_Limit: 800
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
