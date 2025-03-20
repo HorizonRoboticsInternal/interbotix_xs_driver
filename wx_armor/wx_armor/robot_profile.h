@@ -73,8 +73,14 @@ struct MotorInfo
     // them here just to be consistent with dynamixel.
     OpMode op_mode = OpMode::POSITION;
 
-    // The current limit. If it is zero, the motor will be in OpMode::POSITION,
-    // otherwise, it will be in OpMode::CURRENT_BASED_POSITION.
+    // The goal current. If it is zero, the motor will be in OpMode::POSITION.
+    // Otherwise, it will be in OpMode::CURRENT_BASED_POSITION.
+    // Note that only XM motors support OpMode::CURRENT_BASED_POSITION.
+    uint32_t goal_current = 0;
+
+    // The current limit. Generally, this value will never be reached
+    // if operating in current-based position control mode. For position control
+    // mode, if this current is reached, a software-based error will trigger.
     uint32_t current_limit = 0;
 
     // The safety velocity limit in [rad/s]

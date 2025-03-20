@@ -12,31 +12,48 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(const Node& node,
     // Fill in model information.
     for (const auto& child : node["motors"]) {
         YAML::Node info = child.second;
-        uint8_t motor_id = info["ID"].as<uint8_t>();
+        auto motor_id = info["ID"].as<uint8_t>();
         profile.motor_ids.push_back(motor_id);
 
-        // Safety velocity limit is given in [deg/s]. Convert it to [rad/s]
-        float safety_vel_limit = info["Safety_Velocity_Limit"].as<float>();
-        safety_vel_limit *= M_PI / 180.;
+        // Safety velocity limit is given in [rad/s].
+        float safety_vel_limit = 0.0;
+        if (info["Safety_Velocity_Limit"].IsDefined()) {
+            safety_vel_limit = info["Safety_Velocity_Limit"].as<float>();
+        }
 
-        uint32_t current_limit = info["Current_Limit"].as<uint32_t>();
+        // Goal current is given in a range of [0, Current_Limit].
+        uint32_t goal_current = 0;
+        OpMode op_mode = OpMode::POSITION;
+        if (info["Goal_Current"].IsDefined()) {
+            goal_current = info["Goal_Current"].as<uint32_t>();
+            op_mode = goal_current == 0 ? OpMode::POSITION : OpMode::CURRENT_BASED_POSITION;
 
-        OpMode op_mode = (current_limit == 0) ? OpMode::POSITION : OpMode::CURRENT_BASED_POSITION;
+            // The goal current must be <= the current limit.
+            if (goal_current > info["Current_Limit"].as<uint32_t>()) {
+                spdlog::critical("Goal current is larger than the current limit for motor id {}",
+                                 motor_id);
+                std::abort();
+            }
+        }
 
         profile.motors.emplace_back(
             MotorInfo{.id = motor_id,
                       .name = child.first.as<std::string>(),
                       // By default, set the operation mode to position control.
                       .op_mode = op_mode,
-                      .current_limit = current_limit,
+                      .goal_current = goal_current,
+                      .current_limit = info["Current_Limit"].as<uint32_t>(),
                       .safety_vel_limit = safety_vel_limit});
 
         // Now, populate the register table.
         for (const auto& kv : info) {
             std::string key = kv.first.as<std::string>();
-            // Ignore "ID" and "Baud_Rate" as they are not valid register
+            // Ignore the following as they are not valid register
             // names on the motor's internal EEPROM register table.
-            if (key == "ID" || key == "Baud_Rate")
+            // Note that PID gains are also not a part of the EEPROM, but we will
+            // add it for convenience.
+            if (key == "ID" || key == "Baud_Rate" || key == "Safety_Velocity_Limit" ||
+                key == "Goal_Current")
                 continue;
             profile.eeprom.emplace_back(motor_id, key, kv.second.as<int32_t>());
         }

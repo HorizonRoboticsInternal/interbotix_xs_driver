@@ -119,7 +119,7 @@ GuardianThread::GuardianThread() {
                         Driver()->TriggerSafetyViolationMode();
                         SetErrorCode(i, kErrorCurrentLimitViolation);
                         if (!logged)
-                            spdlog::error("Guardian thread detected current limit "
+                            spdlog::error("Guardian thread detected current limit"
                                           "violation for motor "
                                           "{}. Current current: {}, Limit: {}",
                                           i, cc, limit);

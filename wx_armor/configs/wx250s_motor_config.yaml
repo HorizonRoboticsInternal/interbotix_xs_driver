@@ -18,23 +18,34 @@
 #   5) Velocity_Limit................Defines the max speed of the motor. A value of '131' corresponds to a max speed
 #                                    of PI rad/s. NOTE: this is only used in velocity control mode. I.e., has no effect
 #                                    in the default position control setting.
-#   6) Current_Limit.................Defines the current limit of the motor. Any value > 0 will cause the motor to operate
-#                                    in current-based position control mode with the specified current limit. A value of 0
-#                                    defaults to normal position control.
-#                                    in the default position control setting.
-#   7) Min_Position_Limit............Defines the minimum limit of a joint. Values range from 0 to 4095 with 2048
+#   6) Goal_Current..................Defines the goal current [0-Current_Limit] of the motor. Any value > 0 will cause
+#                                    the motor to operate in current-based position control mode with the specified goal current.
+#                                    This value must be less than or equal to Current_Limit. Look below for the conversion.
+#                                    Only applicable to XM-series motors.
+#   7) Current_Limit.................Defines the maximum current allowed [0-1193] of the motor.
+#                                    This value must be greater than or equal to Goal_Current. The conversion for this
+#                                    value is 2.69 mA. In other words, a maximum of ~3.2 A is possible.
+#                                    Note that the effect of this value changes depending on the control mode and motor type.
+#                                    Only XM-series motors officially have this register, so we will avoid writing it to the
+#                                    XL-series ones. In position control mode, this value is unused. In current-based position
+#                                    control mode, this value is used as the maximum current allowed. Since the Goal_Current
+#                                    value is always less than or equal to this value, this value is generally unused as well.
+#                                    What we do use this value for is to initiate a software-based error if the current of a
+#                                    motor ever exceeds this value. Again, note that this should only ever happen under position
+#                                    control mode since in current-based position control mode, the Goal_Current < Current_Limit.
+#   8) Min_Position_Limit............Defines the minimum limit of a joint. Values range from 0 to 4095 with 2048
 #                                    being equivalent to '0' rad and 0 being '-PI' rad.
-#   8) Max_Position_Limit............Defines the maximum limit of a joint. Values range from 0 to 4095 with 2048
+#   9) Max_Position_Limit............Defines the maximum limit of a joint. Values range from 0 to 4095 with 2048
 #                                    being equivalent to '0' rad and 4095 being 'PI' rad.
-#   9) Secondary_ID..................If a joint is controlled by two motors (usually by the shoulder or elbow), one motor
+#  10) Secondary_ID..................If a joint is controlled by two motors (usually by the shoulder or elbow), one motor
 #                                    can be set to follow the commands of another motor by setting this register to the ID
 #                                    of the master. A value of '255' disables this.
-#  10) Safety_Velocity_Limit.........Defines the max safety velocity limit [deg/s]. If the joint velocity ever violates
+#  11) Safety_Velocity_Limit.........Defines the max safety velocity limit [rad/s]. If the joint velocity ever violates
 #                                    this limit, we override the current policy and attempt to slowly decelerate to a stop.
-#                                    Note that for shadowed motors, though an entry is still expected, this value is unused.
-#   11) Safety_Acceleration_Limit....Defines the max safety acceleration limit [deg/s^2]. If the joint acceleration ever violates
-#                                    this limit, we override the current policy and attempt to slowly decelerate to a stop.
-#                                    Note that for shadowed motors, though an entry is still expected, this value is unused.
+#                                    Note that the max speed of the WidowX is extremely high at 24.5 radians per second.
+#                                    Only applicable to non-shadow motors. Shadow motors will use the same value as their
+#                                    master motor. Note that this is NOT an official register defined by Dynamixel. Therefore,
+#                                    we will avoid writing it to the register.
 #
 # Each motor's configs are grouped under the name of the joint the motor is controlling. The names are defined at
 # http://support.interbotix.com/ under the 'Specifications' section. (Click a robot and scroll down to the 'Default Joint Limits' section.)
@@ -69,6 +80,9 @@ shadows:
 
 sisters:
 
+# Users can override this default value for goal current for all XM-motors.
+goal_current: &goal_current_value 800
+
 motors:
   waist:
     ID: 1
@@ -76,13 +90,14 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Goal_Current: *goal_current_value
+    Current_Limit: 1193
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 500
+    Safety_Velocity_Limit: 2
 
   shoulder:
     ID: 2
@@ -90,13 +105,14 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Goal_Current: *goal_current_value
+    Current_Limit: 1193
     Min_Position_Limit: 819
     Max_Position_Limit: 3345
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 1000
+    Safety_Velocity_Limit: 2
 
   shoulder_shadow:
     ID: 3
@@ -104,13 +120,13 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 5
     Velocity_Limit: 131
-    Current_Limit: 0
+    Goal_Current: *goal_current_value
+    Current_Limit: 1193
     Min_Position_Limit: 819
     Max_Position_Limit: 3345
     Secondary_ID: 2
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 1000
 
   elbow:
     ID: 4
@@ -118,13 +134,14 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Goal_Current: *goal_current_value
+    Current_Limit: 1193
     Min_Position_Limit: 648
     Max_Position_Limit: 3094
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 1000
+    Safety_Velocity_Limit: 2
 
   elbow_shadow:
     ID: 5
@@ -132,13 +149,13 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 5
     Velocity_Limit: 131
-    Current_Limit: 0
+    Goal_Current: *goal_current_value
+    Current_Limit: 1193
     Min_Position_Limit: 648
     Max_Position_Limit: 3094
     Secondary_ID: 4
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 1000
 
   forearm_roll:
     ID: 6
@@ -146,13 +163,14 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Goal_Current: *goal_current_value
+    Current_Limit: 1193
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 500
+    Safety_Velocity_Limit: 2
 
   wrist_angle:
     ID: 7
@@ -160,27 +178,29 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 5
     Velocity_Limit: 131
-    Current_Limit: 0
+    Goal_Current: *goal_current_value
+    Current_Limit: 1193
     Min_Position_Limit: 910
     Max_Position_Limit: 3447
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 1000
+    Safety_Velocity_Limit: 2
 
+# Note: everything below here is an XL-series motor.
   wrist_rotate:
     ID: 8
     Baud_Rate: 3
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: 800
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
     Position_P_Gain: 500
     Position_D_Gain: 0
-    Safety_Velocity_Limit: 1000
+    Safety_Velocity_Limit: 2
 
   gripper:
     ID: 9
@@ -188,10 +208,10 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 0
+    Current_Limit: 800
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
     Position_P_Gain: 400
     Position_D_Gain: 3
-    Safety_Velocity_Limit: 1000
+    Safety_Velocity_Limit: 10
