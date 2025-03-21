@@ -270,29 +270,6 @@ void SetOpMode(DynamixelWorkbench* dxl_wb, RobotProfile* profile) {
     }
 }
 
-// Check all the motors and see whether there are motors in error state. If so,
-// that motor is rebooted. This function is called at initialization.
-void RebootMotorIfInErrorState(DynamixelWorkbench* dxl_wb, const RobotProfile& profile) {
-    const char* log;
-    int32_t value = 0;
-    for (const MotorInfo& motor : profile.motors) {
-        bool success = dxl_wb->itemRead(motor.id, "Hardware_Error_Status", &value, &log);
-
-        if (success && value == 0) {
-            continue;
-        }
-        else if (dxl_wb->reboot(motor.id, &log)) {
-            spdlog::info("Motor {} '{}' was in error state, and is rebooted.", motor.id,
-                         motor.name);
-        }
-        else {
-            spdlog::critical("Motor {} '{}' was in error state, but fail to reboot it: {}",
-                             motor.id, motor.name, log);
-            std::abort();
-        }
-    }
-}
-
 }  // namespace
 
 WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_path,
@@ -324,7 +301,6 @@ WxArmorDriver::WxArmorDriver(const std::string& usb_port, fs::path motor_config_
     // on.
     TorqueOff();
 
-    RebootMotorIfInErrorState(&dxl_wb_, profile_);
     if (flash_eeprom) {
         // Note that FlashEEPROM performs "write-on-diff", meaning that it will
         // not write if the desired value and current value are the same. This
@@ -654,6 +630,25 @@ void WxArmorDriver::InitWriteHandler() {
                      "length "
                      "= {})",
                      PROFILE_VEL, PROFILE_ACC, GOAL_POSITION, start, length);
+    }
+}
+
+void WxArmorDriver::RebootMotors() {
+    const char* log;
+    int32_t value = 0;
+    std::unique_lock<std::mutex> handler_lock{io_mutex_};
+    for (const MotorInfo& motor : profile_.motors) {
+        bool success = dxl_wb_.itemRead(motor.id, "Hardware_Error_Status", &value, &log);
+
+        // Skip rebooting if the motor is healthy
+        if (success && value == 0) {
+            continue;
+        }
+
+        // Note that for some reason, this reboot will return False no matter what,
+        // even if the reboot succeeds. Most likely an SDK-related bug from Dynamixel.
+        // For now, we will just assume it worked.
+        dxl_wb_.reboot(motor.id, &log);
     }
 }
 
