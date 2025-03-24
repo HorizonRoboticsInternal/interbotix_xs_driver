@@ -72,6 +72,12 @@ void WxArmorWebController::handleNewMessage(const WebSocketConnectionPtr& conn,
         CheckAndSetPosition(position, moving_time);
     }
     else if (set_pid) {
+        // Make sure to set the position to the current one in case
+        // we are resetting PID after a hard reset to avoid large jumps.
+        std::optional<SensorData> sensor_data = Driver()->Read();
+        if (sensor_data.has_value()) {
+            CheckAndSetPosition(sensor_data.value().pos, 0.0);
+        }
         std::vector<PIDGain> gain_cfgs = nlohmann::json::parse(payload);
         Driver()->SetPID(gain_cfgs);
         guardian_thread_.ResetErrorCodes();
