@@ -38,8 +38,15 @@ Building the packages requires the following dependencies:
   - `sudo apt install -y cmake`
 - build-essential
   - `sudo apt install -y build-essential`
-- [yaml-cpp-dev](https://launchpad.net/ubuntu/+source/yaml-cpp)
-  - `sudo apt install -y yaml-cpp-dev`
+- [yaml-cpp-dev](https://launchpad.net/ubuntu/+source/yaml-cpp) etc.
+  - `sudo apt install -y udev libyaml-cpp-dev libspdlog-dev nlohmann-json3-dev`
+- drogon
+```sh
+sudo apt install -y git gcc g++ cmake libjsoncpp-dev uuid-dev zlib1g-dev
+cd ~/ && git clone https://github.com/drogonframework/drogon
+cd drogon &&  git submodule update --init &&  mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release .. && make && sudo make install
+```
 
 #### Building From Source
 
@@ -51,6 +58,15 @@ cd build
 cmake ..
 make
 sudo make install
+```
+
+#### Setup Faster USB Access
+```sh
+sudo mkdir -p /etc/udev/rules.d
+sudo vi /etc/udev/rules.d/99-dynamixel-usb.rules
+# Paste the following content:
+# U2D2 board (also sets latency timer to 1ms for faster communication)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_MM_DEVICE_IGNORE}="1", ATTR{device/latency_timer}="1", SYMLINK+="ttyDXL", MODE:="0666", GROUP:="plugdev"
 ```
 
 ### Using ROS 2
