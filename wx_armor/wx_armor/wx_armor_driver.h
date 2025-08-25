@@ -345,7 +345,7 @@ class WxArmorDriver
 
     // A tracker for how many iterations the gripper has been closing for
     // without an open command.
-    int32_t closing_iters_{0};
+    uint32_t closing_iters_{0};
 
     // The current gripper position to be updated by Read().
     // Used for delta control when gripper is closing.

@@ -117,6 +117,7 @@ struct RobotProfile
     std::vector<uint8_t> joint_ids{};
     std::vector<std::string> joint_names{};
     std::vector<RegistryKV> eeprom{};
+    uint32_t gripper_closing_iters;
 
     RobotProfile() = default;
     RobotProfile(RobotProfile&&) = default;

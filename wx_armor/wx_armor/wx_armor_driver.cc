@@ -460,7 +460,7 @@ void WxArmorDriver::SetPosition(const std::vector<float>& position, float moving
     }
     // Here, the gripper is closing.
     else {
-        if (closing_iters_ >= 1) {
+        if (closing_iters_ >= profile_.gripper_closing_iters) {
             // After closing for a set number of iterations, we can alleviate
             // the grasp to a less aggressive position goal to prevent
             // gripper motor overload.
@@ -469,7 +469,8 @@ void WxArmorDriver::SetPosition(const std::vector<float>& position, float moving
             float gripper_target = std::max(gripper_position_.load() - 0.1, 0.0);
 
             // Override the gripper target position
-            int_command[--j] = dxl_wb_.convertRadian2Value(profile_.joint_ids[gi], gripper_target);
+            int_command[j - 1] =
+                dxl_wb_.convertRadian2Value(profile_.joint_ids[gi], gripper_target);
         }
         closing_iters_++;
     }
