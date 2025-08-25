@@ -22,6 +22,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # │ Dependencies    │
 # └─────────────────┘
 
+# Add third-party libraries
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party_libraries/DynamixelSDK DynamixelSDK)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party_libraries/dynamixel-workbench dynamixel-workbench)
+
 find_package(yaml-cpp REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -52,6 +56,7 @@ target_sources(wx_armor_driver
 target_link_libraries(wx_armor_driver PUBLIC
     robot_profile
     dynamixel_workbench_toolbox
+    dynamixel_sdk
     spdlog::spdlog
     nlohmann_json::nlohmann_json
     yaml-cpp)
@@ -102,7 +107,7 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 
 install(
-    TARGETS robot_profile wx_armor_driver wx_armor_ws wx_armor guardian_thread
+    TARGETS robot_profile wx_armor_driver wx_armor_ws wx_armor guardian_thread dynamixel_workbench_toolbox dynamixel_sdk
     EXPORT ${PROJECT_NAME}_Targets
     FILE_SET HEADERS)
 
