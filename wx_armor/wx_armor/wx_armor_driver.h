@@ -262,13 +262,6 @@ class WxArmorDriver
     void ResetSafetyViolationMode();
 
     /**
-     * @brief Resets the gripper delta counter to 0
-     */
-    void ResetGripperClosingCounter() {
-        closing_iters_ = 0;
-    }
-
-    /**
      * @brief Returns the profile of the robot.
      */
     const RobotProfile& Profile() const {
