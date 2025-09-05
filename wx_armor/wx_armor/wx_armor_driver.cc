@@ -118,7 +118,7 @@ void FlashEEPROM(DynamixelWorkbench* dxl_wb, const RobotProfile& profile) {
         }
 
         // The XL motors do not have a Current_Limit register.
-        if ((kv.motor_id == 8 || kv.motor_id == 9) && (kv.key == "Current_Limit" )) {
+        if ((kv.motor_id == 8 || kv.motor_id == 9) && (kv.key == "Current_Limit")) {
             continue;
         }
 
@@ -369,6 +369,9 @@ std::optional<SensorData> WxArmorDriver::Read() {
         result.pos[i] = dxl_wb_.convertValue2Radian(profile_.joint_ids[i], joint_buffer[i]);
     }
 
+    // Record the current gripper position for delta closing control. This value is in radians.
+    gripper_position_ = result.pos[profile_.joint_ids.size() - 1];
+
     // 2. Extract Velocity
 
     if (!dxl_wb_.getSyncReadData(read_handler_index_, profile_.joint_ids.data(), num_joints,
@@ -449,8 +452,34 @@ void WxArmorDriver::SetPosition(const std::vector<float>& position, float moving
         int_command[j++] = dxl_wb_.convertRadian2Value(profile_.joint_ids[i], position.at(i));
     }
 
-    const char* log = nullptr;
+    // We need to make sure we lock before performing the gripper delta control logic below
+    // as gripper_position_ is updated in a separate thread in Read().
     std::unique_lock<std::mutex> lock{io_mutex_};
+
+    // Gripper delta control when closing
+    size_t gi = profile_.joint_ids.size() - 1;  // gripper index
+    // Here, the gripper is opening.
+    if (position.at(gi) > 0.5) {
+        closing_iters_ = 0;
+    }
+    // Here, the gripper is closing.
+    else {
+        if (closing_iters_ >= profile_.gripper_closing_iters) {
+            // After closing for a set number of iterations, we can alleviate
+            // the grasp to a less aggressive position goal to prevent
+            // gripper motor overload.
+            // It's crucial to allow closing using the policy's output for a
+            // certain amount of iterations so that dynamics do not get altered.
+            float gripper_target = std::max(gripper_position_ - 0.1, -0.4);
+
+            // Override the gripper target position
+            int_command[j - 1] =
+                dxl_wb_.convertRadian2Value(profile_.joint_ids[gi], gripper_target);
+        }
+        closing_iters_++;
+    }
+
+    const char* log = nullptr;
 
     // NOTE: The number of data for each motor (= 1) in this call to syncWrite()
     // means that each motor will take one int32_t value from

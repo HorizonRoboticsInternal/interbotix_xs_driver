@@ -59,6 +59,8 @@ bool convert<horizon::wx_armor::RobotProfile>::decode(const Node& node,
         }
     }
 
+    profile.gripper_closing_iters = node["gripper_closing_iters"].as<uint32_t>();
+
     // Fill in joint IDs.
     for (const auto& child : node["joint_order"]) {
         std::string name = child.as<std::string>();
