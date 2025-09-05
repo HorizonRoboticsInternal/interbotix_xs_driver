@@ -210,10 +210,10 @@ motors:
     Return_Delay_Time: 0
     Drive_Mode: 4
     Velocity_Limit: 131
-    Current_Limit: 1193
+    Current_Limit: 800
     Min_Position_Limit: 0
     Max_Position_Limit: 4095
     Secondary_ID: 255
     Position_P_Gain: 400
-    Position_D_Gain: 0
+    Position_D_Gain: 3
     Safety_Velocity_Limit: 10

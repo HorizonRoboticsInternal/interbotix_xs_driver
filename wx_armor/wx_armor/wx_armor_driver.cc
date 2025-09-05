@@ -452,6 +452,10 @@ void WxArmorDriver::SetPosition(const std::vector<float>& position, float moving
         int_command[j++] = dxl_wb_.convertRadian2Value(profile_.joint_ids[i], position.at(i));
     }
 
+    // We need to make sure we lock before performing the gripper delta control logic below
+    // as gripper_position_ is updated in a separate thread in Read().
+    std::unique_lock<std::mutex> lock{io_mutex_};
+
     // Gripper delta control when closing
     size_t gi = profile_.joint_ids.size() - 1;  // gripper index
     // Here, the gripper is opening.
@@ -466,7 +470,7 @@ void WxArmorDriver::SetPosition(const std::vector<float>& position, float moving
             // gripper motor overload.
             // It's crucial to allow closing using the policy's output for a
             // certain amount of iterations so that dynamics do not get altered.
-            float gripper_target = std::max(gripper_position_.load() - 0.1, 0.0);
+            float gripper_target = std::max(gripper_position_ - 0.1, -0.4);
 
             // Override the gripper target position
             int_command[j - 1] =
@@ -476,7 +480,6 @@ void WxArmorDriver::SetPosition(const std::vector<float>& position, float moving
     }
 
     const char* log = nullptr;
-    std::unique_lock<std::mutex> lock{io_mutex_};
 
     // NOTE: The number of data for each motor (= 1) in this call to syncWrite()
     // means that each motor will take one int32_t value from

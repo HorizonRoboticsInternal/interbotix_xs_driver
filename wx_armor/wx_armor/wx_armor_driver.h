@@ -342,7 +342,7 @@ class WxArmorDriver
 
     // The current gripper position to be updated by Read().
     // Used for delta control when gripper is closing.
-    std::atomic<double> gripper_position_{1.0};
+    double gripper_position_{1.0};
 };
 
 // Helper function to read the environment variable.
