@@ -35,12 +35,19 @@ build_project() {
 
 
 if [ "$FRESH_INSTALL" = true ]; then
-    apt install -y cmake
-    apt install -y build-essential
-    apt install -y libyaml-cpp-dev
-    apt install libjsoncpp-dev
-    apt install uuid-dev
-
+    # Install dependencies
+    apt-get install -y \
+        cmake \
+        build-essential \
+        libyaml-cpp-dev \
+        libjsoncpp-dev \
+        uuid-dev \
+        nlohmann-json3-dev \
+        udev \
+        libspdlog-dev \
+        gcc \
+        g++ \
+        zlib1g-dev
 
     # Update cmake to version >= 3.23 for Ubuntu 22.04
     # This should be satisfied for Ubuntu 24.04
@@ -61,20 +68,6 @@ if [ "$FRESH_INSTALL" = true ]; then
         echo "CMake version is 3.23 or newer (current: $CMAKE_VERSION). No update needed."
     fi
 
-    # Install json
-    cd /tmp
-    rm -rf json
-    git clone https://github.com/nlohmann/json
-    cd json
-    mkdir build
-    cd build
-    cmake ..
-    make -j"$(nproc)"
-    make install
-    cd /tmp
-    rm -rf json
-    cd "$HOME_DIR"
-
     # Install drogon
     cd /tmp
     rm -rf drogon
@@ -83,25 +76,11 @@ if [ "$FRESH_INSTALL" = true ]; then
     git submodule update --init
     mkdir build
     cd build
-    cmake ..
+    cmake -DCMAKE_BUILD_TYPE=Release ..
     make -j"$(nproc)"
     make install
     cd /tmp
     rm -rf drogon
-    cd "$HOME_DIR"
-
-    # Install spdlog
-    cd /tmp
-    rm -rf spdlog
-    git clone https://github.com/gabime/spdlog.git
-    cd spdlog
-    mkdir build
-    cd build
-    cmake -DSPDLOG_BUILD_SHARED=on ..
-    make -j"$(nproc)"
-    make install
-    cd /tmp
-    rm -rf spdlog
     cd "$HOME_DIR"
 
     # Build dynamixel_sdk
@@ -109,7 +88,25 @@ if [ "$FRESH_INSTALL" = true ]; then
 
     # Build dynamixel_workbench
     build_project "third_party_libraries/dynamixel-workbench"
+
+    # Add udev rules
+    if ! getent group plugdev > /dev/null; then
+        groupadd plugdev
+        usermod -aG plugdev $USER
+        mkdir -p /etc/udev/rules.d
+        tee /etc/udev/rules.d/99-dynamixel-usb.rules > /dev/null <<'EOF'
+# U2D2 board (also sets latency timer to 1ms for faster communication)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", ENV{ID_MM_DEVICE_IGNORE}="1", ATTR{device/latency_timer}="1", SYMLINK+="ttyDXL", MODE:="0666", GROUP:="plugdev"
+EOF
+        udevadm control --reload-rules
+        udevadm trigger
+    fi
 fi
 
 # Build wx_armor
 build_project "wx_armor"
+
+# Everything done in this script was done as root. Need to relax permissions
+# chmod files and directories owned by root
+find $HOME_DIR -user root -type f -exec chmod 777 {} +
+find $HOME_DIR -user root -type d -exec chmod 777 {} +

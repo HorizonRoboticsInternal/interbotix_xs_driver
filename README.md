@@ -28,17 +28,13 @@ make
 
 ### Using Standalone C++ Library
 
-This package is known to build on Ubuntu 22.04 and 24.04. 
+This package is known to build on Ubuntu 22.04 and 24.04.
 No other configuration or environments has been tested. Use at your own risk.
 It should work on other Ubuntu versions as well, so long as cmake is >= 3.23 (look at `build.sh` for details).
 
 #### Building From Source
 
-If building for the first time, first set the following in your .bashrc
-```bash
-export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-```
-Then, run the following
+If building for the first time, simply run the following
 ```sh
 git clone --recursive git@github.com:HorizonRoboticsInternal/interbotix_xs_driver.git -b main
 cd interbotix_xs_driver

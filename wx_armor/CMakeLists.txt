@@ -11,6 +11,12 @@ project(wx_armor
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Add /usr/local to search path for dependencies
+list(APPEND CMAKE_PREFIX_PATH "/usr/local")
+set(CMAKE_INSTALL_RPATH "/usr/local/lib")
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+
+
 include(CMakeDependentOption)
 include(GNUInstallDirs)
 include(InstallRequiredSystemLibraries)
@@ -40,7 +46,7 @@ target_sources(robot_profile
     PRIVATE wx_armor/robot_profile.cc)
 target_link_libraries(robot_profile PUBLIC
     spdlog::spdlog
-    yaml-cpp)
+    yaml-cpp::yaml-cpp)
 
 add_library(wx_armor_driver STATIC)
 target_sources(wx_armor_driver
@@ -54,7 +60,7 @@ target_link_libraries(wx_armor_driver PUBLIC
     dynamixel_workbench_toolbox
     spdlog::spdlog
     nlohmann_json::nlohmann_json
-    yaml-cpp)
+    yaml-cpp::yaml-cpp)
 
 add_library(guardian_thread STATIC)
 target_sources(guardian_thread
