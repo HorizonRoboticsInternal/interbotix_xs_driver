@@ -28,30 +28,26 @@ make
 
 ### Using Standalone C++ Library
 
-This package is known to build on Ubuntu 20.04. No other configuration or environment has been tested and is not supported, though it will probably work on other distributions of Ubuntu.
-
-#### Required Dependencies
-
-Building the packages requires the following dependencies:
-
-- cmake
-  - `sudo apt install -y cmake`
-- build-essential
-  - `sudo apt install -y build-essential`
-- [yaml-cpp-dev](https://launchpad.net/ubuntu/+source/yaml-cpp)
-  - `sudo apt install -y yaml-cpp-dev`
+This package is known to build on Ubuntu 22.04 and 24.04.
+No other configuration or environments has been tested. Use at your own risk.
+It should work on other Ubuntu versions as well, so long as cmake is >= 3.23 (look at `build.sh` for details).
 
 #### Building From Source
 
+If building for the first time, simply run the following
 ```sh
-git clone --recursive https://github.com/HorizonRoboticsInternal/interbotix_xs_driver.git -b main
-cd interbotix_xs_driver/wx_armor
-mkdir build
-cd build
-cmake ..
-make
-sudo make install
+git clone --recursive git@github.com:HorizonRoboticsInternal/interbotix_xs_driver.git -b main
+cd interbotix_xs_driver
+sudo ./build.sh --fresh
 ```
+This should install all dependencies and build `wx_armor`.
+If simply trying to rebuild `wx_armor`, users can run `sudo ./build.sh` without `--fresh`.
+
+Note that current build requires cmake >= 3.23, which will automatically be handled for Ubuntu 22.04 users.
+For Ubuntu 24.04, cmake should already satisfy this requirement.
+
+
+Users can find instructions for installing on Jetson devices [here](https://github.com/HorizonRoboticsInternal/robot-system-config/tree/main/jetson).
 
 ### Using ROS 2
 
