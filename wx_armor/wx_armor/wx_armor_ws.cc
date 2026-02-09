@@ -129,6 +129,7 @@ void WxArmorWebController::CheckAndSetPosition(const std::vector<float>& cmd, fl
         float thd = 0.2;
         if (moving_time > 0.1)
             thd = 2.5 * moving_time;
+            thd *= 2; // due to pd control overshooting and safer teleop.
         if (fabs(reading - cmd[i]) > thd && !Driver()->SafetyViolationTriggered()) {
             spdlog::error("Joint {} command is out of range: {} -> {} > {}. Command "
                           "ignored.",
