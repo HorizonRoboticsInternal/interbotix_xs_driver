@@ -28,7 +28,7 @@
 #                                    Note that the effect of this value changes depending on the control mode and motor type.
 #                                    Only XM-series motors officially have this register, so we will avoid writing it to the
 #                                    XL-series ones. In position control mode, this value is unused. In current-based position
-#                                    control mode, this value is used as the maximum current allowed. Since the Gagentoal_Current
+#                                    control mode, this value is used as the maximum current allowed. Since the Goal_Current
 #                                    value is always less than or equal to this value, this value is generally unused as well.
 #                                    What we do use this value for is to initiate a software-based error if the current of a
 #                                    motor ever exceeds this value. Again, note that this should only ever happen under position
